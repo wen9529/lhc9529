@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- 添加 ?v=2025 强制刷新缓存 -->
+    <link rel="icon" type="image/svg+xml" href="/app-icon.svg?v=2025" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#f8fafc" />
+    <meta name="description" content="AI Lottery Prediction System" />
+    <title>Lottery Prophet</title>
+    
+    <link rel="manifest" href="/manifest.json" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              slate: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+            },
+            animation: { 'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite' }
+          }
+        }
+      }
+    </script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    <!-- 1. 引入 React 和 ReactDOM (UMD 版本) -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- 2. 引入 Babel 用于浏览器端编译 TSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- PWA Install Event Capture -->
+    <script>
+      window.deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        window.deferredPrompt = e;
+        console.log("PWA install event captured globally");
+      });
+    </script>
+  </head>
+  <body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+    <div id="root"></div>
+    
+    <!-- 3. 按依赖顺序加载脚本，使用 text/babel 类型 -->
+    <script type="text/babel" data-presets="typescript" src="/types.ts"></script>
+    <script type="text/babel" data-presets="typescript" src="/lib/zodiac.ts"></script>
+    <script type="text/babel" data-presets="typescript" src="/lib/wave.ts"></script>
+    
+    <script type="text/babel" data-presets="typescript,react" src="/App.tsx"></script>
+    <script type="text/babel" data-presets="typescript,react" src="/index.tsx"></script>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // 注册时也加上版本号，确保 SW 更新
+          navigator.serviceWorker.register('/sw.js?v=10').then(reg => {
+            // 尝试更新
+            reg.update();
+          }).catch(err => console.log('SW Fail', err));
+        });
+      }
+    </script>
+  </body>
+</html>
