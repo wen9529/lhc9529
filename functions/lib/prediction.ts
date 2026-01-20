@@ -15,12 +15,12 @@ interface StrategyResult {
 }
 
 /**
- * 🌌 Nebula Self-Correcting Engine v14.0 (Singularity)
+ * 🌌 Nebula Self-Correcting Engine v15.0 (Galaxy)
  * 
  * 核心特性：
- * 1. 15大确定性算法矩阵：覆盖规律、统计学、几何学、计算机位运算、金融动量指标。
- * 2. 时间衰减回测 (Time-Decay Backtesting)：最近的回测结果权重更高，能更快适应变盘。
- * 3. 复杂算法引入：k-NN (模式匹配), Bitwise (位运算), Momentum (动量指标)。
+ * 1. 18大确定性算法矩阵：矩阵-统计-几何-数论-空间 五维一体。
+ * 2. 时间衰减回测 (Time-Decay Backtesting)：最近的回测结果权重更高。
+ * 3. 新增高阶算法：N-Gram (序列匹配), Prime Balance (质合平衡), Quadrant Flow (象限流动)。
  */
 export class PredictionEngine {
 
@@ -79,7 +79,6 @@ export class PredictionEngine {
     
     // 获取当前表现最好的策略名称
     const bestStrategy = strategies.sort((a, b) => b.weight - a.weight)[0];
-    // 归一化显示准确率 (近似值)
     const displayScore = Math.min(bestStrategy.score * 2.5, 100).toFixed(0); 
     const analysisText = `${bestStrategy.name} (加权强度: ${displayScore})`;
 
@@ -113,7 +112,7 @@ export class PredictionEngine {
     });
     const recHeads = Object.keys(hMap).sort((a, b) => hMap[parseInt(b)] - hMap[parseInt(a)]).slice(0, 3).map(String);
 
-    // 选尾数 (使用独立的增强版尾数趋势算法)
+    // 选尾数
     const tailScores = this.strategyTailTrend(history);
     const recTails = Object.keys(tailScores).map(Number).sort((a, b) => tailScores[b] - tailScores[a]).slice(0, 5).map(String);
 
@@ -128,8 +127,7 @@ export class PredictionEngine {
   }
 
   /**
-   * 自动回测内核 v2.0
-   * 引入时间衰减：最近的验证结果权重更高
+   * 自动回测内核 v2.1
    */
   static runBacktest(history: DbRecord[], windowSize: number): StrategyResult[] {
     const strategyDefinitions = [
@@ -149,10 +147,14 @@ export class PredictionEngine {
       { name: '马尔可夫链 (Markov)', func: this.strategyMarkovChain.bind(this) },
       { name: '泊松分布 (Poisson)', func: this.strategyPoisson.bind(this) },
       { name: '回归趋势 (Regression)', func: this.strategyRegression.bind(this) },
-      // 高阶算法类 (New)
+      // 计算机/金融类
       { name: 'k-近邻 (k-NN)', func: this.strategyKNN.bind(this) },
       { name: '位运算漩涡 (Bitwise)', func: this.strategyBitwiseVortex.bind(this) },
-      { name: '动量震荡 (Momentum)', func: this.strategyMomentum.bind(this) }
+      { name: '动量震荡 (Momentum)', func: this.strategyMomentum.bind(this) },
+      // 新增算法 (New)
+      { name: 'N-Gram (Pattern)', func: this.strategyNGram.bind(this) },
+      { name: '质合平衡 (Prime)', func: this.strategyPrimeComposite.bind(this) },
+      { name: '象限流动 (Quadrant)', func: this.strategyQuadrantFlow.bind(this) }
     ];
 
     const results = strategyDefinitions.map(s => ({ name: s.name, score: 0 }));
@@ -167,9 +169,7 @@ export class PredictionEngine {
       const targetNum = this.parseNumbers(targetRecord.open_code).pop();
       if (!targetNum) continue;
 
-      // 时间衰减因子：i=0 (最新) 权重最大，i=29 (最旧) 权重最小
-      // 公式：Weight = 1 + (1 - i / windowSize)
-      // 例如：最新一期权重 2.0，最老一期权重 1.0
+      // 时间衰减因子
       const timeWeight = 1 + (1 - i / windowSize);
 
       strategyDefinitions.forEach((strat, idx) => {
@@ -180,19 +180,18 @@ export class PredictionEngine {
           .slice(0, 12); // 取前12码验证
         
         if (topPicked.includes(targetNum)) {
-          results[idx].score += timeWeight; // 命中加分
+          results[idx].score += timeWeight;
         }
       });
     }
 
     // 计算最终权重
     return results.map(r => {
-      // 归一化处理，防止权重过大
       const normalizedScore = r.score / windowSize; 
       return {
         name: r.name,
         score: normalizedScore,
-        weight: 1.0 + (normalizedScore * 8.0) // 动态调整放大倍数
+        weight: 1.0 + (normalizedScore * 8.0) 
       };
     });
   }
@@ -223,7 +222,10 @@ export class PredictionEngine {
       '回归趋势 (Regression)': this.strategyRegression.bind(this),
       'k-近邻 (k-NN)': this.strategyKNN.bind(this),
       '位运算漩涡 (Bitwise)': this.strategyBitwiseVortex.bind(this),
-      '动量震荡 (Momentum)': this.strategyMomentum.bind(this)
+      '动量震荡 (Momentum)': this.strategyMomentum.bind(this),
+      'N-Gram (Pattern)': this.strategyNGram.bind(this),
+      '质合平衡 (Prime)': this.strategyPrimeComposite.bind(this),
+      '象限流动 (Quadrant)': this.strategyQuadrantFlow.bind(this)
     };
 
     strategies.forEach(strat => {
@@ -245,26 +247,124 @@ export class PredictionEngine {
   }
 
   // ==========================================
-  // 高阶确定性算法库 (Advanced Deterministic)
+  // v15.0 新增算法 (New Strategies)
   // ==========================================
 
-  // 13. k-近邻算法 (k-Nearest Neighbors) [New]
-  // 将最近 5 期的特码视为一个向量，在历史数据中寻找欧几里得距离最近的 K 个向量
+  // 16. N-Gram 序列模式匹配 (Pattern)
+  // 寻找历史上相同的“前前数-前数”组合，预测下一期的数字
+  static strategyNGram(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const n = 2; // 2-Gram
+      if (history.length < 50) return scores;
+
+      // 提取最新的 2 个特码 (T-1, T-0)
+      const v0 = this.parseNumbers(history[0].open_code).pop(); // T
+      const v1 = this.parseNumbers(history[1].open_code).pop(); // T-1
+
+      if (!v0 || !v1) return scores;
+
+      // 在历史中搜索 [v1, v0] 出现的位置
+      for(let i = 2; i < history.length - 1; i++) {
+           const curr = this.parseNumbers(history[i].open_code).pop(); // 历史某期
+           const prev = this.parseNumbers(history[i+1].open_code).pop(); // 该期的前一期
+
+           if (curr === v0 && prev === v1) {
+               // 找到匹配模式，获取该模式的下一期 (i-1)
+               const next = this.parseNumbers(history[i-1].open_code).pop(); 
+               if (next) {
+                   scores[next] = (scores[next] || 0) + 10;
+               }
+           }
+      }
+      return scores;
+  }
+
+  // 17. 质合平衡 (Prime/Composite Balance)
+  // 分析近期质数(Prime)出现的频率，利用均值回归原理预测
+  static strategyPrimeComposite(history: DbRecord[]): Record<number, number> {
+      const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+      const scores: Record<number, number> = {};
+      
+      // 检查最近 5 期的质数占比
+      let primeCount = 0;
+      const window = 5;
+      for(let i=0; i<window; i++) {
+           const n = this.parseNumbers(history[i].open_code).pop() || 0;
+           if (primes.includes(n)) primeCount++;
+      }
+      
+      const ratio = primeCount / window;
+      // 理论概率约 15/49 ≈ 0.3
+      // 如果近期质数过少 (<0.2)，则预测质数回补
+      // 如果近期质数过多 (>0.6)，则预测合数
+      
+      const expectPrime = ratio < 0.2;
+      const expectComposite = ratio > 0.6;
+
+      for(let i=1; i<=49; i++) {
+          const isPrime = primes.includes(i);
+          if (expectPrime && isPrime) {
+              scores[i] = 6;
+          } else if (expectComposite && !isPrime) {
+              scores[i] = 4;
+          } else if (!expectPrime && !expectComposite) {
+               // 正常波动，不做特殊处理
+          }
+      }
+      return scores;
+  }
+
+  // 18. 象限流动 (Quadrant Flow)
+  // 将 1-49 分为四象限，分析重心的转移规律
+  // Q1: 1-12, Q2: 13-24, Q3: 25-36, Q4: 37-49
+  static strategyQuadrantFlow(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      
+      const getQuad = (n: number) => {
+          if (n <= 12) return 1;
+          if (n <= 24) return 2;
+          if (n <= 36) return 3;
+          return 4;
+      };
+
+      const lastNum = this.parseNumbers(history[0].open_code).pop() || 1;
+      const lastQuad = getQuad(lastNum);
+
+      // 统计转移矩阵：历史上下个象限去哪了
+      const transFreq: Record<number, number> = {1:0, 2:0, 3:0, 4:0};
+      
+      for(let i=1; i<Math.min(history.length, 50); i++) {
+          const prev = this.parseNumbers(history[i].open_code).pop() || 1;
+          if (getQuad(prev) === lastQuad) {
+              const curr = this.parseNumbers(history[i-1].open_code).pop() || 1;
+              transFreq[getQuad(curr)]++;
+          }
+      }
+      
+      const bestQuadStr = Object.keys(transFreq).sort((a,b)=>transFreq[Number(b)]-transFreq[Number(a)])[0];
+      const bestQuad = Number(bestQuadStr);
+
+      // 给目标象限的所有号码加分
+      for(let i=1; i<=49; i++) {
+          if (getQuad(i) === bestQuad) {
+              scores[i] = 4;
+          }
+      }
+      return scores;
+  }
+
+  // ==========================================
+  // 保留原有算法 (1-15)
+  // ==========================================
+  
   static strategyKNN(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
-      const k = 5; // 寻找前5个相似历史
-      const vectorSize = 5; // 向量维度：最近5期
-
+      const k = 5; 
+      const vectorSize = 5; 
       if (history.length < vectorSize * 2) return scores;
-
       const currentVector = [];
-      for(let i=0; i<vectorSize; i++) {
-         currentVector.push(this.parseNumbers(history[i].open_code).pop() || 0);
-      }
-
+      for(let i=0; i<vectorSize; i++) currentVector.push(this.parseNumbers(history[i].open_code).pop() || 0);
       const distances: { dist: number, nextNum: number }[] = [];
-
-      // 遍历历史 (跳过最近 vectorSize 期)
       for(let i = vectorSize; i < Math.min(history.length - vectorSize - 1, 200); i++) {
           let dist = 0;
           let valid = true;
@@ -274,67 +374,41 @@ export class PredictionEngine {
              dist += Math.pow(currentVector[j] - histNum, 2);
           }
           if (valid) {
-             const nextNum = this.parseNumbers(history[i-1].open_code).pop() || 0; // 向量结束后的下一期
+             const nextNum = this.parseNumbers(history[i-1].open_code).pop() || 0; 
              distances.push({ dist: Math.sqrt(dist), nextNum });
           }
       }
-
-      // 排序取前 k 个相似
       distances.sort((a,b) => a.dist - b.dist);
       const topK = distances.slice(0, k);
-
       topK.forEach(item => {
-          if(item.nextNum > 0 && item.nextNum <= 49) {
-              // 距离越小，相似度越高，得分越高
-              scores[item.nextNum] = (scores[item.nextNum] || 0) + (100 / (item.dist + 1));
-          }
+          if(item.nextNum > 0 && item.nextNum <= 49) scores[item.nextNum] = (scores[item.nextNum] || 0) + (100 / (item.dist + 1));
       });
-
       return scores;
   }
 
-  // 14. 位运算漩涡 (Bitwise Vortex) [New]
-  // 利用二进制位运算寻找数字间的逻辑关系 (XOR)
   static strategyBitwiseVortex(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
       const n1 = this.parseNumbers(history[0].open_code).pop() || 0;
       const n2 = this.parseNumbers(history[1].open_code).pop() || 0;
       const n3 = this.parseNumbers(history[2].open_code).pop() || 0;
-
-      // 逻辑1: 异或趋势 (XOR Trend)
-      // 如果 n1 ^ n2 = x, 那么下期可能是 n1 ^ x
       const xorDiff = n1 ^ n2;
       let nextXor = (n1 ^ xorDiff) % 49 || 49;
       scores[nextXor] = 5;
-
-      // 逻辑2: 循环位移模拟 (Circular Shift Simulation)
-      // 简单的位操作模拟混沌
       let chaos = (n1 & n2) | (n2 & n3); 
       chaos = chaos % 49 || 49;
       scores[chaos] = (scores[chaos] || 0) + 5;
-
-      // 逻辑3: 高位与低位平衡
-      // 检查 n1 二进制中 1 的个数
       const countBits = (n: number) => n.toString(2).split('1').length - 1;
       const bits = countBits(n1);
-      // 推荐同样 bits 数量的号码
       for(let i=1; i<=49; i++) {
-          if (countBits(i) === bits) {
-              scores[i] = (scores[i] || 0) + 2;
-          }
+          if (countBits(i) === bits) scores[i] = (scores[i] || 0) + 2;
       }
       return scores;
   }
 
-  // 15. 动量震荡指标 (Momentum Oscillator) [New]
-  // 类似于 RSI，计算号码近期是“超买”还是“超卖”
-  // 如果一个号码最近出现频率远高于平均值，可能会冷却 (Mean Reversion)
-  // 如果一个号码长期未出但近期开始活跃，可能会爆发 (Momentum)
   static strategyMomentum(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
       const shortTerm = 10;
       const longTerm = 50;
-
       const getFreq = (period: number) => {
           const f: Record<number, number> = {};
           for(let i=0; i<Math.min(history.length, period); i++) {
@@ -343,31 +417,17 @@ export class PredictionEngine {
           }
           return f;
       };
-
       const shortFreq = getFreq(shortTerm);
       const longFreq = getFreq(longTerm);
-
       for(let n=1; n<=49; n++) {
           const sf = (shortFreq[n] || 0) / shortTerm;
           const lf = (longFreq[n] || 0) / longTerm;
-          
-          // 动量公式: 短期频率 - 长期频率
-          // 正值表示正在变热 (追热)
           const momentum = sf - lf;
-          
-          if (momentum > 0.05) { // 显著变热
-              scores[n] = momentum * 100;
-          }
-          
-          // 如果短期极热 (例如出现3次以上)，可能是强弩之末，稍微减分 (通过不加分实现)
-          if ((shortFreq[n] || 0) >= 3) {
-              scores[n] = 0; 
-          }
+          if (momentum > 0.05) scores[n] = momentum * 100;
+          if ((shortFreq[n] || 0) >= 3) scores[n] = 0; 
       }
       return scores;
   }
-
-  // --- 原有算法保留 (1-12) ---
 
   static strategyOffset(history: DbRecord[]): Record<number, number> {
     const scores: Record<number, number> = {};
