@@ -8,8 +8,6 @@ window.LotteryType = {
   MO_OLD_2230: 'MO_OLD_2230'
 };
 
-// 接口定义在 TypeScript 编译时会被移除，所以保留即可供 IDE 提示
-// 实际运行时不起作用
 export interface DbRecord {
   id: number;
   lottery_type: string;
@@ -29,6 +27,8 @@ export interface PredictionData {
   };
   heads: string[];
   tails: string[];
+  // 新增：前端显示策略分析
+  strategy_analysis?: string;
 }
 
 export interface DbPrediction {
@@ -44,5 +44,5 @@ export interface ApiResponse {
   latestPrediction: DbPrediction | null;
   lastPrediction: DbPrediction | null;
   history: DbRecord[];
-  predictionHistory: DbPrediction[]; // 新增字段
+  predictionHistory: DbPrediction[]; 
 }

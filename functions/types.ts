@@ -1,4 +1,4 @@
-// File: functions/types.ts
+
 export enum LotteryType {
   HK = 'HK',
   MO_NEW = 'MO_NEW',
@@ -26,14 +26,31 @@ export interface DbRecord {
 }
 
 export interface PredictionData {
-  zodiacs: string[];
-  numbers: string[];
-  wave: {
-    main: string;
-    defense: string;
+  zodiacs: string[];     // 推荐六肖
+  numbers: string[];     // 推荐18码
+  wave: {                // 波色
+    main: string;        // 主攻
+    defense: string;     // 防守
   };
-  heads: string[];
-  tails: string[];
+  heads: string[];       // 推荐三个头
+  tails: string[];       // 推荐五个尾
+  strategy_analysis?: string; // 策略分析报告 (AI Decision)
+}
+
+export interface DbPrediction {
+  id: number;
+  lottery_type: LotteryType;
+  target_expect: string;
+  prediction_numbers: string; 
+  created_at: number;
+}
+
+export interface ApiResponse {
+  latestRecord: DbRecord | null;
+  latestPrediction: DbPrediction | null;
+  lastPrediction: DbPrediction | null;
+  history: DbRecord[];
+  predictionHistory: DbPrediction[];
 }
 
 export interface Env {

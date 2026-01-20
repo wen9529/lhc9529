@@ -154,7 +154,13 @@ const PredictionHistoryModal = ({ isOpen, onClose, predHistory, resultHistory })
              return (
               <div key={predRecord.id} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                   <span className="font-bold text-slate-700 text-sm">目标: 第 {predRecord.target_expect} 期</span>
+                   <div className="flex flex-col">
+                     <span className="font-bold text-slate-700 text-sm">目标: 第 {predRecord.target_expect} 期</span>
+                     {/* 显示当时使用的策略 */}
+                     {predData?.strategy_analysis && (
+                       <span className="text-[9px] text-slate-400 mt-0.5">策略: {predData.strategy_analysis.split('(')[0]}</span>
+                     )}
+                   </div>
                    {verify ? (
                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${verify.isSpecialHit ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-200 text-slate-500'}`}>
                         {verify.isSpecialHit ? '特码命中' : `18码中${verify.numbersHits.length}`}
@@ -182,7 +188,6 @@ const PredictionHistoryModal = ({ isOpen, onClose, predHistory, resultHistory })
                       <div className="text-center text-xs text-slate-400 mb-2">等待开奖结果...</div>
                    )}
                    
-                   {/* 简略显示18码 */}
                    <div className="flex flex-wrap gap-1 justify-center opacity-70">
                       {predData?.numbers.map((n, i) => (
                          <span key={i} className={`text-[10px] w-5 h-5 flex items-center justify-center rounded-full ${verify?.isSpecialHit && n === verify.specialCode ? 'bg-yellow-400 text-white font-bold' : 'bg-slate-100 text-slate-500'}`}>
@@ -201,30 +206,13 @@ const PredictionHistoryModal = ({ isOpen, onClose, predHistory, resultHistory })
   );
 };
 
-// --- IOS 安装提示组件 ---
-const IosInstallGuide = ({ onClose }) => (
-  <div className="bg-slate-800 text-white p-4 rounded-xl mb-4 text-sm relative animate-[fadeIn_0.5s]">
-    <button onClick={onClose} className="absolute top-2 right-2 text-slate-400 hover:text-white">✕</button>
-    <div className="flex items-start gap-3">
-      <span className="text-2xl">📲</span>
-      <div>
-        <p className="font-bold mb-1">安装到 iPhone/iPad</p>
-        <p className="text-slate-300 text-xs leading-relaxed">
-          1. 点击底部浏览器的 <span className="font-bold text-blue-300">分享</span> 按钮<br/>
-          2. 选择 <span className="font-bold text-blue-300">添加到主屏幕</span>
-        </p>
-      </div>
-    </div>
-  </div>
-);
-
 // 挂载到全局
 window.App = function App() {
   const [activeTab, setActiveTab] = useState(LotteryType.HK);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showPredHistory, setShowPredHistory] = useState(false); // 新增状态
+  const [showPredHistory, setShowPredHistory] = useState(false);
   
   // PWA 安装状态
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -233,30 +221,22 @@ window.App = function App() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // 1. 初始化时检查全局变量 (解决 Mobile Chrome 事件触发过早的问题)
     if (window.deferredPrompt) {
       setDeferredPrompt(window.deferredPrompt);
     }
-
-    // 2. 监听安装事件 (Android/PC)
     const handler = (e) => {
       e.preventDefault();
-      // 更新全局变量和状态
       window.deferredPrompt = e;
       setDeferredPrompt(e);
       console.log("PWA install event captured in React");
     };
     window.addEventListener('beforeinstallprompt', handler);
 
-    // 3. 检测 iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     setIsIos(iOS);
-
-    // 4. 检测是否已安装 (Standalone 模式)
     const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator).standalone;
     setIsStandalone(standalone);
 
-    // 如果是 iOS 且未安装，显示引导
     if (iOS && !standalone) {
       setTimeout(() => setShowIosGuide(true), 2000);
     }
@@ -267,12 +247,9 @@ window.App = function App() {
   const handleInstallClick = async () => {
     const promptEvent = deferredPrompt || window.deferredPrompt;
     if (!promptEvent) return;
-    
     promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
-    
     if (outcome === 'accepted') {
-      console.log('User accepted the install prompt');
       setDeferredPrompt(null);
       window.deferredPrompt = null;
     }
@@ -308,14 +285,12 @@ window.App = function App() {
         @keyframes bounce-slow { 0%, 100% { transform: translateY(-5%); } 50% { transform: translateY(0); } }
       `}</style>
       
-      {/* 历史开奖弹窗 */}
       <HistoryModal 
         isOpen={showHistory} 
         onClose={() => setShowHistory(false)} 
         history={data?.history || []} 
       />
 
-      {/* 新增：历史预测弹窗 */}
       <PredictionHistoryModal
         isOpen={showPredHistory}
         onClose={() => setShowPredHistory(false)}
@@ -323,19 +298,16 @@ window.App = function App() {
         resultHistory={data?.history || []}
       />
 
-      {/* 顶部 Header */}
       <header className="bg-white px-4 py-3 border-b border-slate-100 flex justify-between items-center sticky top-0 z-20 shadow-[0_2px_8px_rgba(0,0,0,0.02)] h-16">
         <div className="flex items-center gap-2 overflow-hidden">
            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm shrink-0">
              彩
            </div>
-           {/* 在小屏幕上有安装按钮时隐藏标题，确保布局不乱 */}
            <h1 className={`font-bold text-slate-800 text-lg tracking-tight whitespace-nowrap ${(deferredPrompt && !isStandalone) ? 'hidden sm:block' : 'block'}`}>
              Lottery Prophet
            </h1>
         </div>
         
-        {/* 安装按钮 (仅在非安装模式且浏览器支持时显示) */}
         {!isStandalone && deferredPrompt && (
           <button 
             onClick={handleInstallClick}
@@ -357,9 +329,20 @@ window.App = function App() {
       </div>
 
       <main className="p-4 space-y-6">
-        {/* iOS 安装提示 */}
         {showIosGuide && !isStandalone && (
-           <IosInstallGuide onClose={() => setShowIosGuide(false)} />
+           <div className="bg-slate-800 text-white p-4 rounded-xl mb-4 text-sm relative animate-[fadeIn_0.5s]">
+            <button onClick={() => setShowIosGuide(false)} className="absolute top-2 right-2 text-slate-400 hover:text-white">✕</button>
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">📲</span>
+              <div>
+                <p className="font-bold mb-1">安装到 iPhone/iPad</p>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  1. 点击底部浏览器的 <span className="font-bold text-blue-300">分享</span> 按钮<br/>
+                  2. 选择 <span className="font-bold text-blue-300">添加到主屏幕</span>
+                </p>
+              </div>
+            </div>
+           </div>
         )}
 
         {loading ? (
@@ -426,6 +409,15 @@ window.App = function App() {
 
                 {nextPred ? (
                   <div className="p-4 space-y-4">
+                    {/* 显示当前优胜策略 */}
+                    {nextPred.strategy_analysis && (
+                      <div className="bg-indigo-50/50 rounded-lg p-2 text-center border border-indigo-100">
+                         <p className="text-[10px] text-indigo-600 font-medium">
+                           AI 决策: <span className="font-bold">{nextPred.strategy_analysis}</span>
+                         </p>
+                      </div>
+                    )}
+
                     {/* 第一行：六肖 + 波色 */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -501,7 +493,6 @@ window.App = function App() {
                     <span>上期成绩单</span>
                     <span className="h-px w-10 bg-slate-200"></span>
                   </h3>
-                  {/* 新增查看历史按钮 */}
                   <button 
                      onClick={() => setShowPredHistory(true)}
                      className="text-xs text-indigo-500 font-bold hover:text-indigo-600 transition-colors flex items-center gap-1"
@@ -528,7 +519,6 @@ window.App = function App() {
                        </div>
 
                        <div className="p-4 space-y-4">
-                         {/* 综合验证 */}
                          <div className="grid grid-cols-4 gap-2 text-center text-xs">
                            <div className={`p-2 rounded-lg border ${result.zodiacHit ? 'bg-red-50 border-red-100 text-red-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
                              <div className="font-bold mb-1">六肖</div>
@@ -548,7 +538,6 @@ window.App = function App() {
                            </div>
                          </div>
                          
-                         {/* 详细号码对比 */}
                          <div>
                            <p className="text-xs text-slate-400 mb-2 ml-1">特码结果: <span className="font-bold text-slate-700">{result.specialCode} ({result.specialZodiac})</span></p>
                            <div className="flex flex-wrap gap-2">
@@ -574,7 +563,6 @@ window.App = function App() {
               ) : (
                 <div className="text-center text-slate-400 text-sm py-8 bg-white rounded-xl border border-dashed border-slate-200">
                   <p>暂无上期验证数据</p>
-                  <p className="text-xs mt-1 text-slate-300">数据不足或未生成上期预测</p>
                 </div>
               )}
             </div>
