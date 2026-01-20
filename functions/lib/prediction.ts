@@ -15,12 +15,12 @@ interface StrategyResult {
 }
 
 /**
- * 🌌 Nebula Self-Correcting Engine v15.0 (Galaxy)
+ * 🌌 Nebula Self-Correcting Engine v18.0 (Dimensional Rift)
  * 
  * 核心特性：
- * 1. 18大确定性算法矩阵：矩阵-统计-几何-数论-空间 五维一体。
- * 2. 时间衰减回测 (Time-Decay Backtesting)：最近的回测结果权重更高。
- * 3. 新增高阶算法：N-Gram (序列匹配), Prime Balance (质合平衡), Quadrant Flow (象限流动)。
+ * 1. 26大确定性算法矩阵：涵盖分形、频谱、场论、数论、几何等。
+ * 2. 分形维数 (Fractal)：计算 Hurst 指数判断持久/反持久性。
+ * 3. 引力场 (Gravity)：构建号码势能场寻找低势能点。
  */
 export class PredictionEngine {
 
@@ -80,7 +80,7 @@ export class PredictionEngine {
     // 获取当前表现最好的策略名称
     const bestStrategy = strategies.sort((a, b) => b.weight - a.weight)[0];
     const displayScore = Math.min(bestStrategy.score * 2.5, 100).toFixed(0); 
-    const analysisText = `${bestStrategy.name} (加权强度: ${displayScore})`;
+    const analysisText = `${bestStrategy.name} (强度: ${displayScore})`;
 
     // 2. 综合打分 (Composite Scoring)
     // ------------------------------------------------
@@ -127,7 +127,7 @@ export class PredictionEngine {
   }
 
   /**
-   * 自动回测内核 v2.1
+   * 自动回测内核 v2.4
    */
   static runBacktest(history: DbRecord[], windowSize: number): StrategyResult[] {
     const strategyDefinitions = [
@@ -151,10 +151,21 @@ export class PredictionEngine {
       { name: 'k-近邻 (k-NN)', func: this.strategyKNN.bind(this) },
       { name: '位运算漩涡 (Bitwise)', func: this.strategyBitwiseVortex.bind(this) },
       { name: '动量震荡 (Momentum)', func: this.strategyMomentum.bind(this) },
-      // 新增算法 (New)
+      // 高阶匹配
       { name: 'N-Gram (Pattern)', func: this.strategyNGram.bind(this) },
       { name: '质合平衡 (Prime)', func: this.strategyPrimeComposite.bind(this) },
-      { name: '象限流动 (Quadrant)', func: this.strategyQuadrantFlow.bind(this) }
+      { name: '象限流动 (Quadrant)', func: this.strategyQuadrantFlow.bind(this) },
+      // 物理/自回归
+      { name: '波的干涉 (Interference)', func: this.strategyInterference.bind(this) },
+      { name: '自回归 (AutoReg)', func: this.strategyAutoregression.bind(this) },
+      // 量子/混沌/信息论
+      { name: '奇异吸引子 (Attractor)', func: this.strategyStrangeAttractor.bind(this) },
+      { name: '谐波共振 (Harmonic)', func: this.strategyHarmonicResonance.bind(this) },
+      { name: '熵流 (Entropy)', func: this.strategyEntropyFlow.bind(this) },
+      // 维度/场论 (New v18.0)
+      { name: '分形维数 (Fractal)', func: this.strategyFractalDimension.bind(this) },
+      { name: '频谱分析 (Spectral)', func: this.strategySpectralAnalysis.bind(this) },
+      { name: '引力场 (Gravity)', func: this.strategyGravityField.bind(this) }
     ];
 
     const results = strategyDefinitions.map(s => ({ name: s.name, score: 0 }));
@@ -177,7 +188,7 @@ export class PredictionEngine {
         const topPicked = Object.keys(scores)
           .map(Number)
           .sort((a, b) => scores[b] - scores[a])
-          .slice(0, 12); // 取前12码验证
+          .slice(0, 12); 
         
         if (topPicked.includes(targetNum)) {
           results[idx].score += timeWeight;
@@ -185,7 +196,6 @@ export class PredictionEngine {
       });
     }
 
-    // 计算最终权重
     return results.map(r => {
       const normalizedScore = r.score / windowSize; 
       return {
@@ -225,7 +235,15 @@ export class PredictionEngine {
       '动量震荡 (Momentum)': this.strategyMomentum.bind(this),
       'N-Gram (Pattern)': this.strategyNGram.bind(this),
       '质合平衡 (Prime)': this.strategyPrimeComposite.bind(this),
-      '象限流动 (Quadrant)': this.strategyQuadrantFlow.bind(this)
+      '象限流动 (Quadrant)': this.strategyQuadrantFlow.bind(this),
+      '波的干涉 (Interference)': this.strategyInterference.bind(this),
+      '自回归 (AutoReg)': this.strategyAutoregression.bind(this),
+      '奇异吸引子 (Attractor)': this.strategyStrangeAttractor.bind(this),
+      '谐波共振 (Harmonic)': this.strategyHarmonicResonance.bind(this),
+      '熵流 (Entropy)': this.strategyEntropyFlow.bind(this),
+      '分形维数 (Fractal)': this.strategyFractalDimension.bind(this),
+      '频谱分析 (Spectral)': this.strategySpectralAnalysis.bind(this),
+      '引力场 (Gravity)': this.strategyGravityField.bind(this)
     };
 
     strategies.forEach(strat => {
@@ -240,99 +258,352 @@ export class PredictionEngine {
       }
     });
     
-    // 确定性微扰动
+    // 微扰动
     for (let n = 1; n <= 49; n++) stats[n].totalScore += (n * 0.0001); 
 
     return stats;
   }
 
   // ==========================================
-  // v15.0 新增算法 (New Strategies)
+  // v18.0 新增算法 (New Strategies)
   // ==========================================
 
-  // 16. N-Gram 序列模式匹配 (Pattern)
-  // 寻找历史上相同的“前前数-前数”组合，预测下一期的数字
+  // 24. 分形维数 (Fractal Dimension)
+  // 使用简化的 Hurst 指数 (R/S分析) 判断序列的持久性
+  // H > 0.5: 持久性(趋势跟随) => 追热
+  // H < 0.5: 反持久性(均值回归) => 博冷
+  static strategyFractalDimension(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const n = Math.min(history.length, 32);
+      if (n < 16) return scores;
+
+      // 提取最近 n 期数值
+      const series = [];
+      for(let i=0; i<n; i++) {
+          series.unshift(this.parseNumbers(history[i].open_code).pop() || 25);
+      }
+
+      // 计算均值
+      const mean = series.reduce((a,b)=>a+b, 0) / n;
+      
+      // 计算累积离差 (Accumulated Deviation)
+      let sumDev = 0;
+      let maxDev = -Infinity, minDev = Infinity;
+      for(let x of series) {
+          sumDev += (x - mean);
+          maxDev = Math.max(maxDev, sumDev);
+          minDev = Math.min(minDev, sumDev);
+      }
+      const R = maxDev - minDev; // Range
+
+      // 计算标准差 (Standard Deviation)
+      const variance = series.reduce((a,b)=>a+Math.pow(b-mean, 2), 0) / n;
+      const S = Math.sqrt(variance);
+
+      // 估算 Hurst 指数: R/S ~ c * n^H  => H ~ log(R/S) / log(n)
+      // 简化处理
+      const rs = (S === 0) ? 0 : R/S;
+      const H = (rs === 0) ? 0.5 : Math.log(rs) / Math.log(n);
+
+      // 计算号码热度
+      const freq: Record<number, number> = {};
+      series.forEach(x => freq[x] = (freq[x]||0)+1);
+
+      // H > 0.55: 趋势跟随 (强者恒强)
+      // H < 0.45: 均值回归 (弱者补涨)
+      
+      for(let num=1; num<=49; num++) {
+          const count = freq[num] || 0;
+          if (H > 0.55) {
+              // 追热：近期出现过的加分
+              if (count > 0) scores[num] = count * 3;
+          } else if (H < 0.45) {
+              // 博冷：近期没出现的加分
+              if (count === 0) scores[num] = 5;
+          } else {
+              // 随机游走状态，加分较少
+              scores[num] = 1;
+          }
+      }
+      return scores;
+  }
+
+  // 25. 频谱分析 (Spectral Analysis)
+  // 寻找主导周期 (Dominant Period)
+  static strategySpectralAnalysis(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const N = 16; 
+      if (history.length < N) return scores;
+
+      const series = [];
+      for(let i=0; i<N; i++) series.unshift(this.parseNumbers(history[i].open_code).pop() || 0);
+
+      // 简易 DFT 寻找最强频率 (只检测周期 T=2,3,4,6,8)
+      const periods = [2, 3, 4, 6, 8];
+      let bestPeriod = 0;
+      let maxPower = -1;
+
+      for (let T of periods) {
+          let re = 0, im = 0;
+          for (let t=0; t<N; t++) {
+              const theta = (2 * Math.PI * t) / T;
+              re += series[t] * Math.cos(theta);
+              im += series[t] * Math.sin(theta);
+          }
+          const power = re*re + im*im;
+          if (power > maxPower) {
+              maxPower = power;
+              bestPeriod = T;
+          }
+      }
+
+      if (bestPeriod > 0) {
+          // 根据最佳周期推算下期走势
+          // 简单假设：下期值 = 上期值 + (上期值 - 上n期值)
+          const last = series[N-1];
+          const prevCycle = series[N - 1 - bestPeriod] || series[N-2];
+          
+          // 动量方向
+          const diff = last - prevCycle; 
+          let pred = last + diff;
+          
+          // 边界处理
+          while (pred > 49) pred -= 49;
+          while (pred < 1) pred += 49;
+          
+          scores[pred] = 10;
+          // 谐波防守
+          const harmonic = (pred + Math.round(49/bestPeriod)) % 49 || 49;
+          scores[harmonic] = 5;
+      }
+      return scores;
+  }
+
+  // 26. 引力场 (Gravity Field)
+  // 将近期号码视为质量粒子，计算 1-49 环形空间上的引力势能
+  // 粒子趋向于落入势能最低点 (被近期号码群"吸"过去)
+  static strategyGravityField(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const particles: number[] = [];
+      // 最近 10 期作为引力源
+      for(let i=0; i<Math.min(history.length, 10); i++) {
+          const n = this.parseNumbers(history[i].open_code).pop();
+          if (n) particles.push(n);
+      }
+
+      const getDist = (a: number, b: number) => {
+          const d = Math.abs(a - b);
+          return Math.min(d, 49 - d);
+      };
+
+      // 计算每个位置的势能 V = -Sum(G * M / r)
+      // 我们寻找 V 最小点 (即 1/r 最大点)，也就是离最近号码群最近的点
+      // 但为了避免直接重复，我们寻找“引力平衡点”或“拉格朗日点”
+      // 这里简化为：寻找被引力源包围的“空洞”或高引力区
+      
+      for(let n=1; n<=49; n++) {
+          let potential = 0;
+          for(const p of particles) {
+              let r = getDist(n, p);
+              if (r === 0) r = 0.5; // 避免除零，给自身极大势能
+              potential += 1 / r;
+          }
+          // potential 越大，说明离历史号码越近 (热)
+          // potential 越小，说明离历史号码越远 (冷)
+          
+          // 策略：跟随引力 (Trend) -> 分数与 potential 成正比
+          // 同时引入一点排斥力 (避免完全重合)
+          
+          if (particles.includes(n)) {
+              scores[n] = potential * 2; // 重复号
+          } else {
+              scores[n] = potential * 3; // 邻近号
+          }
+      }
+      return scores;
+  }
+
+  // ==========================================
+  // 保留原有算法 (1-23)
+  // ==========================================
+  
+  static strategyStrangeAttractor(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      if (history.length < 3) return scores;
+      let x = this.parseNumbers(history[0].open_code).pop() || 1;
+      let y = this.parseNumbers(history[1].open_code).pop() || 1;
+      let z = this.parseNumbers(history[2].open_code).pop() || 1;
+      x = (x - 25) * 0.8; y = (y - 25) * 0.8; z = (z - 25) * 0.8;
+      const sigma = 10, rho = 28, beta = 8/3, dt = 0.01;
+      for(let i=0; i<50; i++) {
+          const dx = sigma * (y - x);
+          const dy = x * (rho - z) - y;
+          const dz = x * y - beta * z;
+          x += dx * dt; y += dy * dt; z += dz * dt;
+      }
+      const mapBack = (v: number) => {
+          let n = Math.round((v / 0.8) + 25);
+          n = Math.abs(n) % 49;
+          return n === 0 ? 49 : n;
+      };
+      const predX = mapBack(x); scores[predX] = (scores[predX]||0) + 6;
+      return scores;
+  }
+
+  static strategyHarmonicResonance(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const lastNum = this.parseNumbers(history[0].open_code).pop() || 25;
+      for(let m=2; m<=4; m++) {
+          const harmonic = lastNum * m;
+          if (harmonic <= 49) scores[harmonic] = (scores[harmonic]||0) + 5;
+      }
+      if (lastNum % 2 === 0) scores[lastNum / 2] = (scores[lastNum / 2]||0) + 5;
+      if (lastNum % 3 === 0) scores[lastNum / 3] = (scores[lastNum / 3]||0) + 5;
+      const complement = 49 - lastNum;
+      if (complement > 0) scores[complement] = (scores[complement]||0) + 3;
+      return scores;
+  }
+
+  static strategyEntropyFlow(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const window = 10;
+      if (history.length < window) return scores;
+      const tails = [];
+      for(let i=0; i<window; i++) tails.push((this.parseNumbers(history[i].open_code).pop() || 0) % 10);
+      const calcEntropy = (arr: number[]) => {
+          const freq: Record<number, number> = {};
+          arr.forEach(t => freq[t] = (freq[t]||0) + 1);
+          let entropy = 0;
+          Object.values(freq).forEach(count => {
+              const p = count / arr.length;
+              entropy -= p * Math.log2(p);
+          });
+          return entropy;
+      };
+      const currentEntropy = calcEntropy(tails);
+      const targetHighEntropy = currentEntropy < 2.5;
+      for(let n=1; n<=49; n++) {
+          const t = n % 10;
+          const nextTails = [t, ...tails.slice(0, window-1)];
+          const nextEntropy = calcEntropy(nextTails);
+          if (targetHighEntropy) {
+              if (nextEntropy > currentEntropy) scores[n] = 5;
+          } else {
+              if (nextEntropy <= currentEntropy) scores[n] = 5;
+          }
+      }
+      return scores;
+  }
+  
+  static strategyInterference(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const sources: number[] = [];
+      for(let i=0; i<Math.min(history.length, 8); i++) {
+          const n = this.parseNumbers(history[i].open_code).pop();
+          if (n) sources.push(n);
+      }
+      const getDist = (a: number, b: number) => {
+          const d = Math.abs(a - b);
+          return Math.min(d, 49 - d);
+      };
+      for(let n=1; n<=49; n++) {
+          let amplitude = 0;
+          for(const src of sources) {
+              const d = getDist(n, src);
+              amplitude += 1 / (d * d + 0.5); 
+          }
+          scores[n] = amplitude * 5; 
+      }
+      return scores;
+  }
+
+  static strategyAutoregression(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const trainSet = [];
+      const window = Math.min(history.length, 30);
+      for(let i=0; i<window-2; i++) {
+          const y = this.parseNumbers(history[i].open_code).pop() || 0;     
+          const x1 = this.parseNumbers(history[i+1].open_code).pop() || 0;  
+          const x2 = this.parseNumbers(history[i+2].open_code).pop() || 0;  
+          trainSet.push({y, x1, x2});
+      }
+      let bestW1 = 1, bestW2 = 1, bestScore = -1;
+      for(let w1 = -3; w1 <= 3; w1++) {
+          for(let w2 = -3; w2 <= 3; w2++) {
+              if (w1===0 && w2===0) continue;
+              let hit = 0;
+              trainSet.forEach(item => {
+                   let pred = (w1 * item.x1 + w2 * item.x2) % 49;
+                   if (pred <= 0) pred += 49;
+                   const dist = Math.abs(pred - item.y);
+                   if (dist <= 1 || dist >= 48) hit++;
+              });
+              if (hit > bestScore) {
+                  bestScore = hit;
+                  bestW1 = w1;
+                  bestW2 = w2;
+              }
+          }
+      }
+      const currT1 = this.parseNumbers(history[0].open_code).pop() || 0;
+      const currT2 = this.parseNumbers(history[1].open_code).pop() || 0;
+      let pred = (bestW1 * currT1 + bestW2 * currT2) % 49;
+      if (pred <= 0) pred += 49;
+      scores[pred] = 10;
+      scores[pred-1 > 0 ? pred-1 : 49] = 5;
+      scores[pred+1 <= 49 ? pred+1 : 1] = 5;
+      return scores;
+  }
+  
   static strategyNGram(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
-      const n = 2; // 2-Gram
+      const n = 2; 
       if (history.length < 50) return scores;
-
-      // 提取最新的 2 个特码 (T-1, T-0)
-      const v0 = this.parseNumbers(history[0].open_code).pop(); // T
-      const v1 = this.parseNumbers(history[1].open_code).pop(); // T-1
-
+      const v0 = this.parseNumbers(history[0].open_code).pop(); 
+      const v1 = this.parseNumbers(history[1].open_code).pop(); 
       if (!v0 || !v1) return scores;
-
-      // 在历史中搜索 [v1, v0] 出现的位置
       for(let i = 2; i < history.length - 1; i++) {
-           const curr = this.parseNumbers(history[i].open_code).pop(); // 历史某期
-           const prev = this.parseNumbers(history[i+1].open_code).pop(); // 该期的前一期
-
+           const curr = this.parseNumbers(history[i].open_code).pop();
+           const prev = this.parseNumbers(history[i+1].open_code).pop();
            if (curr === v0 && prev === v1) {
-               // 找到匹配模式，获取该模式的下一期 (i-1)
                const next = this.parseNumbers(history[i-1].open_code).pop(); 
-               if (next) {
-                   scores[next] = (scores[next] || 0) + 10;
-               }
+               if (next) scores[next] = (scores[next] || 0) + 10;
            }
       }
       return scores;
   }
 
-  // 17. 质合平衡 (Prime/Composite Balance)
-  // 分析近期质数(Prime)出现的频率，利用均值回归原理预测
   static strategyPrimeComposite(history: DbRecord[]): Record<number, number> {
       const primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
       const scores: Record<number, number> = {};
-      
-      // 检查最近 5 期的质数占比
       let primeCount = 0;
       const window = 5;
       for(let i=0; i<window; i++) {
            const n = this.parseNumbers(history[i].open_code).pop() || 0;
            if (primes.includes(n)) primeCount++;
       }
-      
       const ratio = primeCount / window;
-      // 理论概率约 15/49 ≈ 0.3
-      // 如果近期质数过少 (<0.2)，则预测质数回补
-      // 如果近期质数过多 (>0.6)，则预测合数
-      
       const expectPrime = ratio < 0.2;
       const expectComposite = ratio > 0.6;
-
       for(let i=1; i<=49; i++) {
           const isPrime = primes.includes(i);
-          if (expectPrime && isPrime) {
-              scores[i] = 6;
-          } else if (expectComposite && !isPrime) {
-              scores[i] = 4;
-          } else if (!expectPrime && !expectComposite) {
-               // 正常波动，不做特殊处理
-          }
+          if (expectPrime && isPrime) scores[i] = 6;
+          else if (expectComposite && !isPrime) scores[i] = 4;
       }
       return scores;
   }
 
-  // 18. 象限流动 (Quadrant Flow)
-  // 将 1-49 分为四象限，分析重心的转移规律
-  // Q1: 1-12, Q2: 13-24, Q3: 25-36, Q4: 37-49
   static strategyQuadrantFlow(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
-      
       const getQuad = (n: number) => {
           if (n <= 12) return 1;
           if (n <= 24) return 2;
           if (n <= 36) return 3;
           return 4;
       };
-
       const lastNum = this.parseNumbers(history[0].open_code).pop() || 1;
       const lastQuad = getQuad(lastNum);
-
-      // 统计转移矩阵：历史上下个象限去哪了
       const transFreq: Record<number, number> = {1:0, 2:0, 3:0, 4:0};
-      
       for(let i=1; i<Math.min(history.length, 50); i++) {
           const prev = this.parseNumbers(history[i].open_code).pop() || 1;
           if (getQuad(prev) === lastQuad) {
@@ -340,22 +611,13 @@ export class PredictionEngine {
               transFreq[getQuad(curr)]++;
           }
       }
-      
       const bestQuadStr = Object.keys(transFreq).sort((a,b)=>transFreq[Number(b)]-transFreq[Number(a)])[0];
       const bestQuad = Number(bestQuadStr);
-
-      // 给目标象限的所有号码加分
       for(let i=1; i<=49; i++) {
-          if (getQuad(i) === bestQuad) {
-              scores[i] = 4;
-          }
+          if (getQuad(i) === bestQuad) scores[i] = 4;
       }
       return scores;
   }
-
-  // ==========================================
-  // 保留原有算法 (1-15)
-  // ==========================================
   
   static strategyKNN(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
