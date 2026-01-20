@@ -40,7 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const status = {
      status: "Active",
      message: "Telegram Bot Function is running.",
-     version: "v14.0 Singularity (15-Strategy Matrix)",
+     version: "v15.0 Galaxy (18-Strategy Matrix)",
      timestamp: new Date().toISOString()
   };
   return new Response(JSON.stringify(status, null, 2), {
@@ -78,12 +78,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     // --- Start / ID ---
     if (command === '/start' || command === '/id') {
       const isAdmin = String(chatId) === String(env.ADMIN_CHAT_ID);
-      let msg = `👋 <b>彩票助手 v14.0 (Singularity)</b>\n\n`;
+      let msg = `👋 <b>彩票助手 v15.0 (Galaxy)</b>\n\n`;
       msg += `🆔 您的ID: <code>${chatId}</code>\n`;
       msg += `⚙️ 状态: ${isAdmin ? '✅ 管理员' : '⚠️ 访客 (只读)'}`;
       
       if (isAdmin) {
-        msg += `\n\n奇点引擎已就绪 (15大确定性策略矩阵 | 智能权重)，请使用下方菜单操作 👇`;
+        msg += `\n\n银河引擎已就绪 (18大确定性策略矩阵 | 智能时空加权)，请使用下方菜单操作 👇`;
         await sendMessage(env.TELEGRAM_TOKEN, chatId, msg, { parse_mode: 'HTML', reply_markup: MENU_KEYBOARD });
       } else {
         await sendMessage(env.TELEGRAM_TOKEN, chatId, msg, { parse_mode: 'HTML' });
@@ -143,7 +143,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         return new Response('OK');
       }
 
-      // 启动 v14.0 引擎
+      // 启动 v15.0 引擎
       const predictionData = PredictionEngine.generate(results as any[], targetType);
       
       const lastExpect = (results[0] as any).expect;
@@ -156,7 +156,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       const waveName = (w: string) => w === 'red' ? '🟥红' : w === 'blue' ? '🟦蓝' : '🟩绿';
       
       const strategyInfo = predictionData.strategy_analysis 
-        ? `\n🧠 <b>AI 决策 (加权回测):</b>\n${predictionData.strategy_analysis}` 
+        ? `\n🧠 <b>AI 决策 (18核矩阵):</b>\n${predictionData.strategy_analysis}` 
         : '';
 
       const msg = `✅ <b>${targetType} 第 ${nextExpect} 期预测</b>\n` +
