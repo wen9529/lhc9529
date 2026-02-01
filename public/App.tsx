@@ -16,7 +16,8 @@ const parsePrediction = (predStr) => {
         numbers: predStr.split(','),
         wave: { main: 'red', defense: 'blue' },
         heads: [],
-        tails: []
+        tails: [],
+        ai_eight_codes: []
       };
     }
     return null;
@@ -82,6 +83,9 @@ const verifyResult = (record, pred) => {
     const hits = pred.numbers.filter(n => nums.includes(n));
     const isSpecialHit = pred.numbers.includes(specialCode);
     
+    // AI 8码验证
+    const isAiHit = pred.ai_eight_codes ? pred.ai_eight_codes.includes(specialCode) : false;
+    
     return {
       specialCode,
       specialZodiac,
@@ -90,7 +94,8 @@ const verifyResult = (record, pred) => {
       headHit: pred.heads.includes(specialHead),
       tailHit: pred.tails.includes(specialTail),
       numbersHits: hits,
-      isSpecialHit
+      isSpecialHit,
+      isAiHit
     };
 };
 
@@ -158,7 +163,9 @@ const PredictionHistoryModal = ({ isOpen, onClose, predHistory, resultHistory })
                      <span className="font-bold text-slate-700 text-sm">目标: 第 {predRecord.target_expect} 期</span>
                      {/* 显示当时使用的策略 */}
                      {predData?.strategy_analysis && (
-                       <span className="text-[9px] text-slate-400 mt-0.5">策略: {predData.strategy_analysis.split('(')[0]}</span>
+                       <span className="text-[9px] text-slate-400 mt-0.5 max-w-[200px] truncate">
+                         {predData.strategy_analysis.split(' | ')[0]}
+                       </span>
                      )}
                    </div>
                    {verify ? (
@@ -171,13 +178,17 @@ const PredictionHistoryModal = ({ isOpen, onClose, predHistory, resultHistory })
                 </div>
                 <div className="p-3">
                    {verify ? (
-                      <div className="flex gap-2 text-xs mb-2 justify-center">
+                      <div className="flex gap-2 text-xs mb-2 justify-center flex-wrap">
                          <span className={verify.zodiacHit ? 'text-red-500 font-bold' : 'text-slate-400'}>
                            六肖{verify.zodiacHit?'中':'挂'}
                          </span>
                          <span className="text-slate-300">|</span>
                          <span className={verify.waveHit ? 'text-blue-500 font-bold' : 'text-slate-400'}>
                            波色{verify.waveHit?'中':'挂'}
+                         </span>
+                         <span className="text-slate-300">|</span>
+                         <span className={verify.isAiHit ? 'text-purple-500 font-bold' : 'text-slate-400'}>
+                           AI{verify.isAiHit?'中':'挂'}
                          </span>
                          <span className="text-slate-300">|</span>
                          <span className="text-slate-500">
@@ -408,12 +419,12 @@ window.App = function App() {
                 </div>
 
                 {nextPred ? (
-                  <div className="p-4 space-y-4">
+                  <div className="p-4 space-y-5">
                     {/* 显示当前优胜策略 */}
                     {nextPred.strategy_analysis && (
                       <div className="bg-indigo-50/50 rounded-lg p-2 text-center border border-indigo-100">
                          <p className="text-[10px] text-indigo-600 font-medium">
-                           AI 决策: <span className="font-bold">{nextPred.strategy_analysis}</span>
+                           核心引擎: <span className="font-bold">{nextPred.strategy_analysis.split(' | ')[0]}</span>
                          </p>
                       </div>
                     )}
@@ -470,6 +481,32 @@ window.App = function App() {
                         ))}
                       </div>
                     </div>
+                    
+                    {/* 第四行：AI 8码推荐 (New) */}
+                    {nextPred.ai_eight_codes && nextPred.ai_eight_codes.length > 0 && (
+                      <div className="relative overflow-hidden rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-3 shadow-sm">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-400 to-indigo-500"></div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="text-xs font-bold text-purple-700 flex items-center gap-1">
+                                <span className="text-lg">🤖</span> AI 智能精选 (8码中特)
+                            </h4>
+                            {nextPred.strategy_analysis?.includes('AI') && (
+                                <span className="text-[9px] text-purple-400 border border-purple-100 px-1 rounded">Gemini Powered</span>
+                            )}
+                        </div>
+                        {nextPred.strategy_analysis?.split('| AI: ')[1] && (
+                            <p className="text-[10px] text-slate-500 mb-2 italic border-l-2 border-purple-200 pl-2">
+                                "{nextPred.strategy_analysis.split('| AI: ')[1]}"
+                            </p>
+                        )}
+                        <div className="flex flex-wrap gap-2 justify-center">
+                            {nextPred.ai_eight_codes.map((num, i) => (
+                                <NumberBall key={`ai-${i}`} num={num} size="md" highlight={true} />
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 ) : (
                   <div className="text-center py-8 w-full">
@@ -528,11 +565,11 @@ window.App = function App() {
                              <div className="font-bold mb-1">波色</div>
                              <div>{result.waveHit ? '命中' : '未中'}</div>
                            </div>
-                           <div className={`p-2 rounded-lg border ${result.headHit ? 'bg-green-50 border-green-100 text-green-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                             <div className="font-bold mb-1">头数</div>
-                             <div>{result.headHit ? '命中' : '未中'}</div>
+                           <div className={`p-2 rounded-lg border ${result.isAiHit ? 'bg-purple-50 border-purple-100 text-purple-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                             <div className="font-bold mb-1">AI</div>
+                             <div>{result.isAiHit ? '命中' : '未中'}</div>
                            </div>
-                           <div className={`p-2 rounded-lg border ${result.tailHit ? 'bg-purple-50 border-purple-100 text-purple-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                           <div className={`p-2 rounded-lg border ${result.tailHit ? 'bg-green-50 border-green-100 text-green-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
                              <div className="font-bold mb-1">尾数</div>
                              <div>{result.tailHit ? '命中' : '未中'}</div>
                            </div>
