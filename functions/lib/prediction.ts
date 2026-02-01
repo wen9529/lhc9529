@@ -15,12 +15,11 @@ interface StrategyResult {
 }
 
 /**
- * 🌌 Omniscient Core v20.0 (Gemini Awakening)
+ * 🌌 Omniscient Core v20.1 (Gemini Awakening)
  * 
  * 核心升级：
- * 1. 集成 Google Gemini AI 进行非线性特码预测 (8码中特)。
- * 2. 保持 29 大确定性算法作为数学基石。
- * 3. 移除 @google/genai SDK 依赖，使用原生 fetch 以兼容无构建环境。
+ * 1. 修正 AI 模型为 'gemini-1.5-flash' 以确保稳定性。
+ * 2. 优化 AI 提示词结构。
  */
 export class PredictionEngine {
 
@@ -125,33 +124,32 @@ export class PredictionEngine {
          ).join('\n');
 
          const prompt = `
-         角色：你是一位精通概率统计和混沌数学的彩票分析专家。
-         任务：基于以下最近20期开奖记录（格式：期号: 平码1,平码2,平码3,平码4,平码5,平码6,特码），分析特码（最后一个号码）的走势。
+         分析最近20期彩票开奖记录，运用概率学和混沌理论预测下一期特码。
          
          历史数据：
          ${historyText}
          
-         要求：
-         1. 运用你的“全知核心”算法，结合波色、生肖、五行、尾数走势。
-         2. 预测下一期最可能出现的“特码”。
-         3. 输出 8 个最有可能的号码作为“8码中特”推荐。
-         4. 必须以 JSON 格式输出，不要包含 Markdown 代码块标记。
+         请从统计学角度（如冷热、遗漏、波色趋势）分析，推荐 8 个最可能的特码。
          
-         JSON格式：
+         请严格按 JSON 格式输出，不要包含 Markdown 标记：
          {
-           "codes": ["01", "12", "23", "34", "45", "06", "17", "28"],
-           "reason": "简短分析理由(20字内)"
+           "codes": ["01", "02", "03", "04", "05", "06", "07", "08"],
+           "reason": "简短理由(20字内)"
          }
          `;
 
-         // 使用原生 fetch 调用 Gemini API，避免引入 SDK 依赖
-         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+         // 使用 gemini-1.5-flash，它更稳定且支持 JSON mode
+         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+         
          const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: 'application/json' }
+              generationConfig: { 
+                  responseMimeType: 'application/json',
+                  temperature: 0.7 
+              }
             })
          });
 
@@ -160,27 +158,36 @@ export class PredictionEngine {
            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
            
            if (text) {
-               const json = JSON.parse(text);
-               if (Array.isArray(json.codes) && json.codes.length > 0) {
-                   const formattedCodes = json.codes.map((c: any) => {
-                       const n = parseInt(String(c));
-                       return n < 10 ? `0${n}` : `${n}`;
-                   }).slice(0, 8).sort();
-                   
-                   aiEightCodes = formattedCodes;
-                   if (json.reason) {
-                       analysisText += ` | AI: ${json.reason}`;
-                   }
+               try {
+                 const json = JSON.parse(text);
+                 if (Array.isArray(json.codes) && json.codes.length > 0) {
+                     const formattedCodes = json.codes.map((c: any) => {
+                         const n = parseInt(String(c));
+                         return n < 10 ? `0${n}` : `${n}`;
+                     }).slice(0, 8).sort();
+                     
+                     aiEightCodes = formattedCodes;
+                     if (json.reason) {
+                         analysisText += ` | AI: ${json.reason}`;
+                     }
+                 }
+               } catch (e) {
+                 console.error("AI Response Parse Error:", text);
+                 analysisText += " (AI数据解析错误)";
                }
            }
          } else {
-             console.error("Gemini API Error Status:", response.status);
-             analysisText += " (AI接口异常)";
+             const errText = await response.text();
+             console.error("Gemini API Error:", response.status, errText);
+             // 如果是 404，可能是模型不存在；如果是 400，可能是参数问题
+             if (response.status === 404) analysisText += " (AI模型未找到)";
+             else if (response.status === 429) analysisText += " (AI配额超限)";
+             else analysisText += ` (AI接口${response.status})`;
          }
 
       } catch (e) {
-          console.error("Gemini API Error", e);
-          analysisText += " (AI繁忙, 使用数学模型)";
+          console.error("Gemini Fetch Error", e);
+          analysisText += " (AI网络错误)";
       }
     } else {
        // API Key not set
