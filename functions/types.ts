@@ -34,6 +34,7 @@ export interface PredictionData {
   };
   heads: string[];       // 推荐三个头
   tails: string[];       // 推荐五个尾
+  ai_eight_codes?: string[]; // AI 推荐 8 码中特
   strategy_analysis?: string; // 策略分析报告 (AI Decision)
 }
 
@@ -61,4 +62,5 @@ export interface Env {
   URL_MO_NEW: string;
   URL_MO_OLD: string;
   URL_MO_OLD_2230: string;
+  GEMINI_API_KEY?: string;
 }
