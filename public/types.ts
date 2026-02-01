@@ -27,7 +27,7 @@ export interface PredictionData {
   };
   heads: string[];
   tails: string[];
-  // 新增：前端显示策略分析
+  ai_eight_codes?: string[]; // AI 推荐 8 码
   strategy_analysis?: string;
 }
 
