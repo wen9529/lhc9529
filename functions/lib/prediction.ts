@@ -1,5 +1,4 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { LotteryType, PredictionData, DbRecord } from '../types';
 
 interface NumberStat {
@@ -21,6 +20,7 @@ interface StrategyResult {
  * 核心升级：
  * 1. 集成 Google Gemini AI 进行非线性特码预测 (8码中特)。
  * 2. 保持 29 大确定性算法作为数学基石。
+ * 3. 移除 @google/genai SDK 依赖，使用原生 fetch 以兼容无构建环境。
  */
 export class PredictionEngine {
 
@@ -120,7 +120,6 @@ export class PredictionEngine {
 
     if (apiKey) {
       try {
-         const ai = new GoogleGenAI({ apiKey: apiKey });
          const historyText = history.slice(0, 20).map(r => 
              `第${r.expect}期: ${r.open_code}`
          ).join('\n');
@@ -145,27 +144,38 @@ export class PredictionEngine {
          }
          `;
 
-         const resp = await ai.models.generateContent({
-             model: 'gemini-2.5-flash',
-             contents: prompt,
-             config: { responseMimeType: 'application/json' }
+         // 使用原生 fetch 调用 Gemini API，避免引入 SDK 依赖
+         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+         const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' }
+            })
          });
-         
-         const text = resp.text;
-         if (text) {
-             const json = JSON.parse(text);
-             if (Array.isArray(json.codes) && json.codes.length > 0) {
-                 // 确保格式化为两位数字符串
-                 const formattedCodes = json.codes.map((c: any) => {
-                     const n = parseInt(String(c));
-                     return n < 10 ? `0${n}` : `${n}`;
-                 }).slice(0, 8).sort();
-                 
-                 aiEightCodes = formattedCodes;
-                 if (json.reason) {
-                     analysisText += ` | AI: ${json.reason}`;
-                 }
-             }
+
+         if (response.ok) {
+           const data: any = await response.json();
+           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+           
+           if (text) {
+               const json = JSON.parse(text);
+               if (Array.isArray(json.codes) && json.codes.length > 0) {
+                   const formattedCodes = json.codes.map((c: any) => {
+                       const n = parseInt(String(c));
+                       return n < 10 ? `0${n}` : `${n}`;
+                   }).slice(0, 8).sort();
+                   
+                   aiEightCodes = formattedCodes;
+                   if (json.reason) {
+                       analysisText += ` | AI: ${json.reason}`;
+                   }
+               }
+           }
+         } else {
+             console.error("Gemini API Error Status:", response.status);
+             analysisText += " (AI接口异常)";
          }
 
       } catch (e) {
