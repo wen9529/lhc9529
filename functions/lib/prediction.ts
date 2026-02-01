@@ -1,4 +1,5 @@
 
+import { GoogleGenAI } from "@google/genai";
 import { LotteryType, PredictionData, DbRecord } from '../types';
 
 interface NumberStat {
@@ -10,17 +11,16 @@ interface NumberStat {
 
 interface StrategyResult {
   name: string;
-  score: number; // 加权得分
-  weight: number; // 最终影响权重
+  score: number; // 归一化得分 (0-1)
+  weight: number; // 最终动态权重
 }
 
 /**
- * 🌌 Nebula Self-Correcting Engine v18.0 (Dimensional Rift)
+ * 🌌 Omniscient Core v20.0 (Gemini Awakening)
  * 
- * 核心特性：
- * 1. 26大确定性算法矩阵：涵盖分形、频谱、场论、数论、几何等。
- * 2. 分形维数 (Fractal)：计算 Hurst 指数判断持久/反持久性。
- * 3. 引力场 (Gravity)：构建号码势能场寻找低势能点。
+ * 核心升级：
+ * 1. 集成 Google Gemini AI 进行非线性特码预测 (8码中特)。
+ * 2. 保持 29 大确定性算法作为数学基石。
  */
 export class PredictionEngine {
 
@@ -63,58 +63,118 @@ export class PredictionEngine {
     }
   }
 
-  /**
-   * 生成预测主入口
-   */
-  static generate(history: DbRecord[], type: LotteryType): PredictionData {
+  static async generate(history: DbRecord[], type: LotteryType, apiKey?: string): Promise<PredictionData> {
     this.initializeMaps();
     
-    // 数据量检查
-    if (!history || history.length < 80) return this.generateFallback(history);
+    if (!history || history.length < 50) return this.generateFallback(history);
 
-    // 1. 运行深度回测系统 (Backtesting Kernel)
-    // ------------------------------------------------
-    const backtestWindow = 30;
-    const strategies = this.runBacktest(history, backtestWindow);
-    
-    // 获取当前表现最好的策略名称
+    // 1. 确定性算法部分
+    const strategies = this.runBacktest(history, 20);
     const bestStrategy = strategies.sort((a, b) => b.weight - a.weight)[0];
-    const displayScore = Math.min(bestStrategy.score * 2.5, 100).toFixed(0); 
-    const analysisText = `${bestStrategy.name} (强度: ${displayScore})`;
+    const displayScore = (bestStrategy.score * 100).toFixed(0); 
+    let analysisText = `${bestStrategy.name} (PI: ${displayScore})`;
 
-    // 2. 综合打分 (Composite Scoring)
-    // ------------------------------------------------
     const stats = this.calculateCompositeScores(history, strategies);
-
-    // 3. 选码逻辑
-    // ------------------------------------------------
     const sortedStats = Object.values(stats).sort((a, b) => b.totalScore - a.totalScore);
     
-    // 选 18 码
+    // 18码
     const final18 = sortedStats.slice(0, 18);
     const resultNumbers = final18.map(s => s.num).sort((a, b) => a - b).map(n => n < 10 ? `0${n}` : `${n}`);
 
-    // 选 6 肖
+    // 六肖
     const zMap: Record<string, number> = {};
-    final18.forEach(s => zMap[s.zodiac] = (zMap[s.zodiac] || 0) + s.totalScore);
+    final18.forEach((s, idx) => {
+        const w = idx < 10 ? 2 : 1;
+        zMap[s.zodiac] = (zMap[s.zodiac] || 0) + s.totalScore * w;
+    });
     const recZodiacs = Object.keys(zMap).sort((a, b) => zMap[b] - zMap[a]).slice(0, 6);
 
-    // 选波色
+    // 波色
     const wMap: Record<string, number> = { red: 0, blue: 0, green: 0 };
     final18.forEach(s => wMap[s.wave] = (wMap[s.wave] || 0) + s.totalScore);
     const recWaves = Object.keys(wMap).sort((a, b) => wMap[b as any] - wMap[a as any]);
 
-    // 选头数
+    // 头数
     const hMap: Record<number, number> = {};
     final18.forEach(s => {
         const h = Math.floor(s.num / 10);
-        hMap[h] = (hMap[h] || 0) + 1;
+        hMap[h] = (hMap[h] || 0) + s.totalScore;
     });
     const recHeads = Object.keys(hMap).sort((a, b) => hMap[parseInt(b)] - hMap[parseInt(a)]).slice(0, 3).map(String);
 
-    // 选尾数
-    const tailScores = this.strategyTailTrend(history);
-    const recTails = Object.keys(tailScores).map(Number).sort((a, b) => tailScores[b] - tailScores[a]).slice(0, 5).map(String);
+    // 尾数
+    const tailTrend = this.strategyTailTrend(history);
+    const tMap: Record<number, number> = {};
+    Object.entries(tailTrend).forEach(([t, s]) => tMap[Number(t)] = s);
+    final18.forEach(s => {
+        const t = s.num % 10;
+        tMap[t] = (tMap[t] || 0) + s.totalScore * 5;
+    });
+    const recTails = Object.keys(tMap).map(Number).sort((a, b) => tMap[b] - tMap[a]).slice(0, 5).map(String);
+
+    // 2. AI 智能推荐 (8码中特)
+    let aiEightCodes: string[] = [];
+    // 默认兜底：取确定性算法得分最高的前8个
+    const top8Stats = sortedStats.slice(0, 8);
+    aiEightCodes = top8Stats.map(s => s.num < 10 ? `0${s.num}` : `${s.num}`).sort();
+
+    if (apiKey) {
+      try {
+         const ai = new GoogleGenAI({ apiKey: apiKey });
+         const historyText = history.slice(0, 20).map(r => 
+             `第${r.expect}期: ${r.open_code}`
+         ).join('\n');
+
+         const prompt = `
+         角色：你是一位精通概率统计和混沌数学的彩票分析专家。
+         任务：基于以下最近20期开奖记录（格式：期号: 平码1,平码2,平码3,平码4,平码5,平码6,特码），分析特码（最后一个号码）的走势。
+         
+         历史数据：
+         ${historyText}
+         
+         要求：
+         1. 运用你的“全知核心”算法，结合波色、生肖、五行、尾数走势。
+         2. 预测下一期最可能出现的“特码”。
+         3. 输出 8 个最有可能的号码作为“8码中特”推荐。
+         4. 必须以 JSON 格式输出，不要包含 Markdown 代码块标记。
+         
+         JSON格式：
+         {
+           "codes": ["01", "12", "23", "34", "45", "06", "17", "28"],
+           "reason": "简短分析理由(20字内)"
+         }
+         `;
+
+         const resp = await ai.models.generateContent({
+             model: 'gemini-2.5-flash',
+             contents: prompt,
+             config: { responseMimeType: 'application/json' }
+         });
+         
+         const text = resp.text;
+         if (text) {
+             const json = JSON.parse(text);
+             if (Array.isArray(json.codes) && json.codes.length > 0) {
+                 // 确保格式化为两位数字符串
+                 const formattedCodes = json.codes.map((c: any) => {
+                     const n = parseInt(String(c));
+                     return n < 10 ? `0${n}` : `${n}`;
+                 }).slice(0, 8).sort();
+                 
+                 aiEightCodes = formattedCodes;
+                 if (json.reason) {
+                     analysisText += ` | AI: ${json.reason}`;
+                 }
+             }
+         }
+
+      } catch (e) {
+          console.error("Gemini API Error", e);
+          analysisText += " (AI繁忙, 使用数学模型)";
+      }
+    } else {
+       // API Key not set
+    }
 
     return {
       zodiacs: recZodiacs,
@@ -122,86 +182,49 @@ export class PredictionEngine {
       wave: { main: recWaves[0], defense: recWaves[1] },
       heads: recHeads,
       tails: recTails,
+      ai_eight_codes: aiEightCodes,
       strategy_analysis: analysisText
     };
   }
 
-  /**
-   * 自动回测内核 v2.4
-   */
   static runBacktest(history: DbRecord[], windowSize: number): StrategyResult[] {
-    const strategyDefinitions = [
-      // 基础规律类
-      { name: '偏移轨迹 (Offset)', func: this.strategyOffset.bind(this) },
-      { name: '遗漏回补 (Omission)', func: this.strategyOmission.bind(this) },
-      { name: '生肖转移 (Link)', func: this.strategyZodiacLink.bind(this) },
-      { name: '历史镜像 (Mirror)', func: this.strategyHistoryMirror.bind(this) },
-      { name: '时空模数 (Modulo)', func: this.strategyModulo.bind(this) },
-      // 数学/几何类
-      { name: '黄金分割 (Golden)', func: this.strategyGoldenSection.bind(this) },
-      { name: '合数走势 (DigitSum)', func: this.strategyDigitSum.bind(this) },
-      // 规则映射类
-      { name: '五行相生 (Element)', func: this.strategyFiveElements.bind(this) },
-      { name: '三合六合 (Harmony)', func: this.strategyZodiacHarmony.bind(this) },
-      // 统计学类
-      { name: '马尔可夫链 (Markov)', func: this.strategyMarkovChain.bind(this) },
-      { name: '泊松分布 (Poisson)', func: this.strategyPoisson.bind(this) },
-      { name: '回归趋势 (Regression)', func: this.strategyRegression.bind(this) },
-      // 计算机/金融类
-      { name: 'k-近邻 (k-NN)', func: this.strategyKNN.bind(this) },
-      { name: '位运算漩涡 (Bitwise)', func: this.strategyBitwiseVortex.bind(this) },
-      { name: '动量震荡 (Momentum)', func: this.strategyMomentum.bind(this) },
-      // 高阶匹配
-      { name: 'N-Gram (Pattern)', func: this.strategyNGram.bind(this) },
-      { name: '质合平衡 (Prime)', func: this.strategyPrimeComposite.bind(this) },
-      { name: '象限流动 (Quadrant)', func: this.strategyQuadrantFlow.bind(this) },
-      // 物理/自回归
-      { name: '波的干涉 (Interference)', func: this.strategyInterference.bind(this) },
-      { name: '自回归 (AutoReg)', func: this.strategyAutoregression.bind(this) },
-      // 量子/混沌/信息论
-      { name: '奇异吸引子 (Attractor)', func: this.strategyStrangeAttractor.bind(this) },
-      { name: '谐波共振 (Harmonic)', func: this.strategyHarmonicResonance.bind(this) },
-      { name: '熵流 (Entropy)', func: this.strategyEntropyFlow.bind(this) },
-      // 维度/场论 (New v18.0)
-      { name: '分形维数 (Fractal)', func: this.strategyFractalDimension.bind(this) },
-      { name: '频谱分析 (Spectral)', func: this.strategySpectralAnalysis.bind(this) },
-      { name: '引力场 (Gravity)', func: this.strategyGravityField.bind(this) }
-    ];
+    const strategyDefinitions = this.getStrategies();
+    const results = strategyDefinitions.map(s => ({ name: s.name, rawScore: 0, maxPotential: 0 }));
 
-    const results = strategyDefinitions.map(s => ({ name: s.name, score: 0 }));
-
-    // 回测循环
     for (let i = 0; i < windowSize; i++) {
       const targetRecord = history[i];
       const trainingData = history.slice(i + 1);
-      
       if (trainingData.length < 50) break; 
 
       const targetNum = this.parseNumbers(targetRecord.open_code).pop();
       if (!targetNum) continue;
 
-      // 时间衰减因子
-      const timeWeight = 1 + (1 - i / windowSize);
+      const timeWeight = Math.pow(0.85, i);
 
       strategyDefinitions.forEach((strat, idx) => {
         const scores = strat.func(trainingData);
         const topPicked = Object.keys(scores)
           .map(Number)
           .sort((a, b) => scores[b] - scores[a])
-          .slice(0, 12); 
+          .slice(0, 8); 
         
+        results[idx].maxPotential += timeWeight;
+
         if (topPicked.includes(targetNum)) {
-          results[idx].score += timeWeight;
+          const rank = topPicked.indexOf(targetNum);
+          const rankBonus = (8 - rank) / 8; 
+          results[idx].rawScore += timeWeight * (0.5 + 0.5 * rankBonus);
         }
       });
     }
 
     return results.map(r => {
-      const normalizedScore = r.score / windowSize; 
+      const normalizedScore = r.maxPotential > 0 ? r.rawScore / r.maxPotential : 0;
+      const dynamicWeight = 1.0 + Math.pow(normalizedScore * 4, 2); 
       return {
         name: r.name,
         score: normalizedScore,
-        weight: 1.0 + (normalizedScore * 8.0) 
+        weight: dynamicWeight
       };
     });
   }
@@ -217,34 +240,8 @@ export class PredictionEngine {
       };
     }
 
-    const funcMap: Record<string, Function> = {
-      '偏移轨迹 (Offset)': this.strategyOffset.bind(this),
-      '遗漏回补 (Omission)': this.strategyOmission.bind(this),
-      '生肖转移 (Link)': this.strategyZodiacLink.bind(this),
-      '历史镜像 (Mirror)': this.strategyHistoryMirror.bind(this),
-      '时空模数 (Modulo)': this.strategyModulo.bind(this),
-      '黄金分割 (Golden)': this.strategyGoldenSection.bind(this),
-      '五行相生 (Element)': this.strategyFiveElements.bind(this),
-      '三合六合 (Harmony)': this.strategyZodiacHarmony.bind(this),
-      '合数走势 (DigitSum)': this.strategyDigitSum.bind(this),
-      '马尔可夫链 (Markov)': this.strategyMarkovChain.bind(this),
-      '泊松分布 (Poisson)': this.strategyPoisson.bind(this),
-      '回归趋势 (Regression)': this.strategyRegression.bind(this),
-      'k-近邻 (k-NN)': this.strategyKNN.bind(this),
-      '位运算漩涡 (Bitwise)': this.strategyBitwiseVortex.bind(this),
-      '动量震荡 (Momentum)': this.strategyMomentum.bind(this),
-      'N-Gram (Pattern)': this.strategyNGram.bind(this),
-      '质合平衡 (Prime)': this.strategyPrimeComposite.bind(this),
-      '象限流动 (Quadrant)': this.strategyQuadrantFlow.bind(this),
-      '波的干涉 (Interference)': this.strategyInterference.bind(this),
-      '自回归 (AutoReg)': this.strategyAutoregression.bind(this),
-      '奇异吸引子 (Attractor)': this.strategyStrangeAttractor.bind(this),
-      '谐波共振 (Harmonic)': this.strategyHarmonicResonance.bind(this),
-      '熵流 (Entropy)': this.strategyEntropyFlow.bind(this),
-      '分形维数 (Fractal)': this.strategyFractalDimension.bind(this),
-      '频谱分析 (Spectral)': this.strategySpectralAnalysis.bind(this),
-      '引力场 (Gravity)': this.strategyGravityField.bind(this)
-    };
+    const funcMap: Record<string, Function> = {};
+    this.getStrategies().forEach(s => funcMap[s.name] = s.func);
 
     strategies.forEach(strat => {
       const logicFunc = funcMap[strat.name];
@@ -258,35 +255,121 @@ export class PredictionEngine {
       }
     });
     
-    // 微扰动
-    for (let n = 1; n <= 49; n++) stats[n].totalScore += (n * 0.0001); 
+    for (let n = 1; n <= 49; n++) stats[n].totalScore += (n * 0.00001); 
 
     return stats;
   }
 
-  // ==========================================
-  // v18.0 新增算法 (New Strategies)
-  // ==========================================
+  static getStrategies() {
+      return [
+        { name: '偏移轨迹 (Offset)', func: this.strategyOffset.bind(this) },
+        { name: '遗漏回补 (Omission)', func: this.strategyOmission.bind(this) },
+        { name: '生肖转移 (Link)', func: this.strategyZodiacLink.bind(this) },
+        { name: '历史镜像 (Mirror)', func: this.strategyHistoryMirror.bind(this) },
+        { name: '时空模数 (Modulo)', func: this.strategyModulo.bind(this) },
+        { name: '黄金分割 (Golden)', func: this.strategyGoldenSection.bind(this) },
+        { name: '合数走势 (DigitSum)', func: this.strategyDigitSum.bind(this) },
+        { name: '五行相生 (Element)', func: this.strategyFiveElements.bind(this) },
+        { name: '三合六合 (Harmony)', func: this.strategyZodiacHarmony.bind(this) },
+        { name: '马尔可夫链 (Markov)', func: this.strategyMarkovChain.bind(this) },
+        { name: '泊松分布 (Poisson)', func: this.strategyPoisson.bind(this) },
+        { name: '回归趋势 (Regression)', func: this.strategyRegression.bind(this) },
+        { name: 'k-近邻 (k-NN)', func: this.strategyKNN.bind(this) },
+        { name: '位运算漩涡 (Bitwise)', func: this.strategyBitwiseVortex.bind(this) },
+        { name: '动量震荡 (Momentum)', func: this.strategyMomentum.bind(this) },
+        { name: 'N-Gram (Pattern)', func: this.strategyNGram.bind(this) },
+        { name: '质合平衡 (Prime)', func: this.strategyPrimeComposite.bind(this) },
+        { name: '象限流动 (Quadrant)', func: this.strategyQuadrantFlow.bind(this) },
+        { name: '波的干涉 (Interference)', func: this.strategyInterference.bind(this) },
+        { name: '自回归 (AutoReg)', func: this.strategyAutoregression.bind(this) },
+        { name: '奇异吸引子 (Attractor)', func: this.strategyStrangeAttractor.bind(this) },
+        { name: '谐波共振 (Harmonic)', func: this.strategyHarmonicResonance.bind(this) },
+        { name: '熵流 (Entropy)', func: this.strategyEntropyFlow.bind(this) },
+        { name: '分形维数 (Fractal)', func: this.strategyFractalDimension.bind(this) },
+        { name: '频谱分析 (Spectral)', func: this.strategySpectralAnalysis.bind(this) },
+        { name: '引力场 (Gravity)', func: this.strategyGravityField.bind(this) },
+        { name: '椭圆曲线 (ECC)', func: this.strategyEllipticCurve.bind(this) },
+        { name: '卡尔曼滤波 (Kalman)', func: this.strategyKalmanFilter.bind(this) },
+        { name: '矩阵行列式 (Matrix)', func: this.strategyMatrixDeterminant.bind(this) }
+      ];
+  }
 
-  // 24. 分形维数 (Fractal Dimension)
-  // 使用简化的 Hurst 指数 (R/S分析) 判断序列的持久性
-  // H > 0.5: 持久性(趋势跟随) => 追热
-  // H < 0.5: 反持久性(均值回归) => 博冷
+  // Strategies
+  static strategyEllipticCurve(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const a = 2, b = 3; 
+      const p = 49; 
+      const last = this.parseNumbers(history[0].open_code).pop() || 1;
+      const prev = this.parseNumbers(history[1].open_code).pop() || 1;
+      const calcY2 = (x: number) => (Math.pow(x, 3) + a * x + b) % p;
+      const targetY2 = calcY2(last);
+      const targetY2_prev = calcY2(prev);
+      for(let x=1; x<=49; x++) {
+          const y2 = calcY2(x);
+          if (Math.abs(y2 - targetY2) <= 2) scores[x] = 5;
+          if (Math.abs(y2 - targetY2_prev) <= 1) scores[x] = (scores[x]||0) + 3;
+      }
+      return scores;
+  }
+
+  static strategyKalmanFilter(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      const data = [];
+      for(let i=0; i<Math.min(history.length, 10); i++) {
+          data.unshift(this.parseNumbers(history[i].open_code).pop() || 25);
+      }
+      let x = data[0]; 
+      let p = 10;      
+      const q = 2;     
+      const r = 5;     
+      let k = 0;       
+      for(let i=1; i<data.length; i++) {
+          p = p + q;
+          k = p / (p + r);
+          x = x + k * (data[i] - x);
+          p = (1 - k) * p;
+      }
+      let pred = Math.round(x);
+      while(pred > 49) pred -= 49;
+      while(pred < 1) pred += 49;
+      scores[pred] = 10;
+      const err = Math.round(Math.sqrt(p));
+      for(let i=1; i<=err; i++) {
+         let up = pred + i; if(up>49) up-=49;
+         let down = pred - i; if(down<1) down+=49;
+         scores[up] = 5;
+         scores[down] = 5;
+      }
+      return scores;
+  }
+
+  static strategyMatrixDeterminant(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {};
+      if (history.length < 9) return scores;
+      const grid = [];
+      for(let i=0; i<9; i++) grid.push(this.parseNumbers(history[i].open_code).pop() || 0);
+      const det = 
+          grid[0]*(grid[4]*grid[8] - grid[5]*grid[7]) -
+          grid[1]*(grid[3]*grid[8] - grid[5]*grid[6]) +
+          grid[2]*(grid[3]*grid[7] - grid[4]*grid[6]);
+      let seed = Math.abs(Math.round(det));
+      const n1 = (seed % 49) || 49;
+      scores[n1] = 8;
+      const trace = grid[0] + grid[4] + grid[8];
+      const n2 = (trace % 49) || 49;
+      scores[n2] = (scores[n2]||0) + 6;
+      return scores;
+  }
+  
   static strategyFractalDimension(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
       const n = Math.min(history.length, 32);
       if (n < 16) return scores;
-
-      // 提取最近 n 期数值
       const series = [];
       for(let i=0; i<n; i++) {
           series.unshift(this.parseNumbers(history[i].open_code).pop() || 25);
       }
-
-      // 计算均值
       const mean = series.reduce((a,b)=>a+b, 0) / n;
-      
-      // 计算累积离差 (Accumulated Deviation)
       let sumDev = 0;
       let maxDev = -Infinity, minDev = Infinity;
       for(let x of series) {
@@ -294,55 +377,35 @@ export class PredictionEngine {
           maxDev = Math.max(maxDev, sumDev);
           minDev = Math.min(minDev, sumDev);
       }
-      const R = maxDev - minDev; // Range
-
-      // 计算标准差 (Standard Deviation)
+      const R = maxDev - minDev; 
       const variance = series.reduce((a,b)=>a+Math.pow(b-mean, 2), 0) / n;
       const S = Math.sqrt(variance);
-
-      // 估算 Hurst 指数: R/S ~ c * n^H  => H ~ log(R/S) / log(n)
-      // 简化处理
       const rs = (S === 0) ? 0 : R/S;
       const H = (rs === 0) ? 0.5 : Math.log(rs) / Math.log(n);
-
-      // 计算号码热度
       const freq: Record<number, number> = {};
       series.forEach(x => freq[x] = (freq[x]||0)+1);
-
-      // H > 0.55: 趋势跟随 (强者恒强)
-      // H < 0.45: 均值回归 (弱者补涨)
-      
       for(let num=1; num<=49; num++) {
           const count = freq[num] || 0;
           if (H > 0.55) {
-              // 追热：近期出现过的加分
               if (count > 0) scores[num] = count * 3;
           } else if (H < 0.45) {
-              // 博冷：近期没出现的加分
               if (count === 0) scores[num] = 5;
           } else {
-              // 随机游走状态，加分较少
               scores[num] = 1;
           }
       }
       return scores;
   }
 
-  // 25. 频谱分析 (Spectral Analysis)
-  // 寻找主导周期 (Dominant Period)
   static strategySpectralAnalysis(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
       const N = 16; 
       if (history.length < N) return scores;
-
       const series = [];
       for(let i=0; i<N; i++) series.unshift(this.parseNumbers(history[i].open_code).pop() || 0);
-
-      // 简易 DFT 寻找最强频率 (只检测周期 T=2,3,4,6,8)
       const periods = [2, 3, 4, 6, 8];
       let bestPeriod = 0;
       let maxPower = -1;
-
       for (let T of periods) {
           let re = 0, im = 0;
           for (let t=0; t<N; t++) {
@@ -356,76 +419,46 @@ export class PredictionEngine {
               bestPeriod = T;
           }
       }
-
       if (bestPeriod > 0) {
-          // 根据最佳周期推算下期走势
-          // 简单假设：下期值 = 上期值 + (上期值 - 上n期值)
           const last = series[N-1];
           const prevCycle = series[N - 1 - bestPeriod] || series[N-2];
-          
-          // 动量方向
           const diff = last - prevCycle; 
           let pred = last + diff;
-          
-          // 边界处理
           while (pred > 49) pred -= 49;
           while (pred < 1) pred += 49;
-          
           scores[pred] = 10;
-          // 谐波防守
           const harmonic = (pred + Math.round(49/bestPeriod)) % 49 || 49;
           scores[harmonic] = 5;
       }
       return scores;
   }
 
-  // 26. 引力场 (Gravity Field)
-  // 将近期号码视为质量粒子，计算 1-49 环形空间上的引力势能
-  // 粒子趋向于落入势能最低点 (被近期号码群"吸"过去)
   static strategyGravityField(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
       const particles: number[] = [];
-      // 最近 10 期作为引力源
       for(let i=0; i<Math.min(history.length, 10); i++) {
           const n = this.parseNumbers(history[i].open_code).pop();
           if (n) particles.push(n);
       }
-
       const getDist = (a: number, b: number) => {
           const d = Math.abs(a - b);
           return Math.min(d, 49 - d);
       };
-
-      // 计算每个位置的势能 V = -Sum(G * M / r)
-      // 我们寻找 V 最小点 (即 1/r 最大点)，也就是离最近号码群最近的点
-      // 但为了避免直接重复，我们寻找“引力平衡点”或“拉格朗日点”
-      // 这里简化为：寻找被引力源包围的“空洞”或高引力区
-      
       for(let n=1; n<=49; n++) {
           let potential = 0;
           for(const p of particles) {
               let r = getDist(n, p);
-              if (r === 0) r = 0.5; // 避免除零，给自身极大势能
+              if (r === 0) r = 0.5; 
               potential += 1 / r;
           }
-          // potential 越大，说明离历史号码越近 (热)
-          // potential 越小，说明离历史号码越远 (冷)
-          
-          // 策略：跟随引力 (Trend) -> 分数与 potential 成正比
-          // 同时引入一点排斥力 (避免完全重合)
-          
           if (particles.includes(n)) {
-              scores[n] = potential * 2; // 重复号
+              scores[n] = potential * 2; 
           } else {
-              scores[n] = potential * 3; // 邻近号
+              scores[n] = potential * 3; 
           }
       }
       return scores;
   }
-
-  // ==========================================
-  // 保留原有算法 (1-23)
-  // ==========================================
   
   static strategyStrangeAttractor(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
@@ -949,7 +982,8 @@ export class PredictionEngine {
         wave: {main:'red', defense:'blue'},
         heads: ['0','1','2'],
         tails: ['1','2','3','4','5'],
-        strategy_analysis: "基础热度兜底 (数据不足，无随机)"
+        ai_eight_codes: resultNums.slice(0, 8),
+        strategy_analysis: "基础热度兜底 (数据不足)"
     };
   }
 
