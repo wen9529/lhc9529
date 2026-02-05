@@ -1,5 +1,5 @@
 // File: public/sw.js
-const CACHE_NAME = "lottery-pwa-v10";
+const CACHE_NAME = "lottery-pwa-v11";
 const ASSETS = [
   "/",
   "/index.html",
@@ -48,6 +48,8 @@ self.addEventListener("fetch", (e) => {
   
   e.respondWith(
     caches.match(e.request).then((response) => {
+      // 即使有缓存，如果请求 URL 带有 v 参数，建议网络优先（虽然这里简单处理，
+      // 但上面的 cacheName 更新通常已足够解决问题）
       return response || fetch(e.request);
     })
   );
