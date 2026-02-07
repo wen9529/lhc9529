@@ -52,7 +52,7 @@ const NumberBall = ({ num, size = 'md', showZodiac = false, highlight = false, d
       : 'ring-2 ring-white';
 
   return (
-    <div className="flex flex-col items-center gap-1 transition-all duration-300">
+    <div className="flex flex-col items-center gap-1 transition-all duration-300 relative z-10">
       <div className={`${sizeClass} rounded-full flex items-center justify-center font-bold text-white shadow-md ${colorClass} ${extraClass}`}>
         {num}
       </div>
@@ -224,6 +224,7 @@ window.App = function App() {
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showPredHistory, setShowPredHistory] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   // PWA 安装状态
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -268,6 +269,8 @@ window.App = function App() {
 
   const fetchLotteryData = async (type) => {
     setLoading(true);
+    // 切换标签时重置复制状态
+    setCopied(false);
     try {
       const res = await fetch(`/api/data?type=${type}`);
       if (res.ok) {
@@ -285,6 +288,20 @@ window.App = function App() {
     fetchLotteryData(activeTab);
   }, [activeTab]);
 
+  const handleCopy = () => {
+    if (!data?.latestPrediction) return;
+    const nextPred = parsePrediction(data.latestPrediction.prediction_numbers);
+    if (!nextPred || !nextPred.numbers) return;
+
+    const text = nextPred.numbers.join(',');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error("Copy failed", err);
+    });
+  };
+
   const nextPred = data?.latestPrediction ? parsePrediction(data.latestPrediction.prediction_numbers) : null;
   const lastPred = data?.lastPrediction ? parsePrediction(data.lastPrediction.prediction_numbers) : null;
 
@@ -294,6 +311,7 @@ window.App = function App() {
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes bounce-slow { 0%, 100% { transform: translateY(-5%); } 50% { transform: translateY(0); } }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2); } }
       `}</style>
       
       <HistoryModal 
@@ -472,41 +490,53 @@ window.App = function App() {
                       </div>
                     </div>
 
-                    {/* 第三行：18码 */}
+                    {/* 第三行：18码 (集成 AI 高亮 + 复制按钮) */}
                     <div className="space-y-2">
-                      <h4 className="text-[10px] text-slate-400 uppercase font-bold tracking-wider text-center">精选 18 码</h4>
-                      <div className="flex flex-wrap gap-2 justify-center bg-slate-50/50 p-3 rounded-xl border border-slate-100/50">
-                        {nextPred.numbers.map((num, i) => (
-                           <NumberBall key={i} num={num} size="md" showZodiac={true} />
-                        ))}
+                      <div className="flex justify-between items-center px-1">
+                        <h4 className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">精选 18 码</h4>
+                        <button 
+                          onClick={handleCopy}
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${copied ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {copied ? (
+                            <>
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                              已复制
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                              复制号码
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-3 justify-center bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">
+                        {nextPred.numbers.map((num, i) => {
+                           // 检查该号码是否在 AI 推荐列表中
+                           const isAiSelected = nextPred.ai_eight_codes && nextPred.ai_eight_codes.includes(num);
+                           
+                           return (
+                             <div key={i} className={`relative p-1 rounded-xl transition-all duration-500 ${isAiSelected ? 'bg-red-50 ring-2 ring-red-500 animate-[pulse-red_2s_infinite]' : ''}`}>
+                                {isAiSelected && (
+                                  <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm z-20 border border-white">
+                                    <span className="text-[8px] text-white font-bold">AI</span>
+                                  </div>
+                                )}
+                                <NumberBall num={num} size="md" showZodiac={true} />
+                             </div>
+                           );
+                        })}
+                      </div>
+                      {/* 图例说明 */}
+                      <div className="flex justify-center gap-2 mt-1">
+                        <div className="flex items-center gap-1">
+                           <span className="w-3 h-3 rounded bg-red-50 border border-red-500 block"></span>
+                           <span className="text-[10px] text-slate-400">红色框 = AI 智能精选 (8码)</span>
+                        </div>
                       </div>
                     </div>
-                    
-                    {/* 第四行：AI 8码推荐 (New) */}
-                    {nextPred.ai_eight_codes && nextPred.ai_eight_codes.length > 0 && (
-                      <div className="relative overflow-hidden rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white p-3 shadow-sm">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-400 to-indigo-500"></div>
-                        <div className="flex justify-between items-center mb-2">
-                            <h4 className="text-xs font-bold text-purple-700 flex items-center gap-1">
-                                <span className="text-lg">🤖</span> AI 智能精选 (8码中特)
-                            </h4>
-                            {nextPred.strategy_analysis?.includes('AI') && (
-                                <span className="text-[9px] text-purple-400 border border-purple-100 px-1 rounded">Gemini Powered</span>
-                            )}
-                        </div>
-                        {nextPred.strategy_analysis?.split('| AI: ')[1] && (
-                            <p className="text-[10px] text-slate-500 mb-2 italic border-l-2 border-purple-200 pl-2">
-                                "{nextPred.strategy_analysis.split('| AI: ')[1]}"
-                            </p>
-                        )}
-                        <div className="flex flex-wrap gap-2 justify-center">
-                            {nextPred.ai_eight_codes.map((num, i) => (
-                                <NumberBall key={`ai-${i}`} num={num} size="md" highlight={true} />
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
                   </div>
                 ) : (
                   <div className="text-center py-8 w-full">
