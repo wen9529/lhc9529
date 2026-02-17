@@ -11,11 +11,16 @@ interface StrategyResult {
   name: string;
   score: number; // 归一化得分 (0-1)
   weight: number; // 最终动态权重
+  momentum: number; // 动量得分
+  recentHits: number;
 }
 
 /**
- * 🌌 Omniscient Core v20.7 (Precision Math)
- * 修正了尾数策略的映射问题，确保所有号码均能被算法覆盖
+ * 🌌 Omniscient Core v22.0 (The Singularity - 算法奇点)
+ * 1. 算法大一统：整合30+种确定性策略，形成全息预测矩阵。
+ * 2. 动态动量回测 (Dynamic Momentum)：引入时间衰减与动量因子，精准捕捉策略的"手感"变化。
+ * 3. 排名敏感度 (Rank Sensitivity)：对 Top 3 命中给予指数级奖励，平庸策略权重快速归零。
+ * 4. 绝对零熵 (Zero Entropy)：全链路去随机化，确保预测结果的数学唯一性。
  */
 export class PredictionEngine {
 
@@ -72,66 +77,78 @@ export class PredictionEngine {
     
     if (!history || history.length < 50) return this.generateFallback(history);
 
-    // 1. 确定性算法部分 - 回测与权重计算
-    const strategies = this.runBacktest(history, 20);
-    const bestStrategy = strategies.sort((a, b) => b.weight - a.weight)[0];
-    const displayScore = (bestStrategy.score * 100).toFixed(0); 
+    // 1. 核心回测：扩大窗口至 30 期，捕捉中长期与短期结合的信号
+    const strategies = this.runBacktest(history, 30);
     
-    // 生成分析文案
+    // 排序策略 (权重 > 动量 > 名称)
+    const bestStrategy = strategies.sort((a, b) => 
+        (b.weight - a.weight) || (b.momentum - a.momentum) || a.name.localeCompare(b.name)
+    )[0];
+    
+    const displayScore = (bestStrategy.score * 100).toFixed(0); 
     let analysisText = `Core: ${bestStrategy.name} (PI: ${displayScore})`;
 
-    // 计算综合得分
+    // 2. 计算综合算力得分
     const stats = this.calculateCompositeScores(history, strategies);
-    const sortedStats = Object.values(stats).sort((a, b) => b.totalScore - a.totalScore);
+    // 排序：总分 > 号码数值 (确保确定性)
+    const sortedStats = Object.values(stats).sort((a, b) => (b.totalScore - a.totalScore) || (a.num - b.num));
     
     // 提取 Top 18
     const final18 = sortedStats.slice(0, 18);
     const resultNumbers = final18.map(s => s.num).sort((a, b) => a - b).map(n => n < 10 ? `0${n}` : `${n}`);
 
-    // 六肖 (基于 Top 18 的加权统计)
+    // 3. 六肖生成 (Top 18 加权 + 数量归一化)
     const zMap: Record<string, number> = {};
     final18.forEach((s, idx) => {
-        const w = idx < 10 ? 2 : 1;
+        // 前6名权重更高 (黄金位置)
+        const w = idx < 6 ? 3 : (idx < 12 ? 2 : 1); 
         zMap[s.zodiac] = (zMap[s.zodiac] || 0) + s.totalScore * w;
     });
-    const recZodiacs = Object.keys(zMap).sort((a, b) => zMap[b] - zMap[a]).slice(0, 6);
 
-    // 波色
+    const recZodiacs = Object.keys(zMap).sort((a, b) => {
+        const countA = this.ZODIACS_MAP[a]?.length || 4;
+        const countB = this.ZODIACS_MAP[b]?.length || 4;
+        // 归一化公式：消除生肖号码数量差异
+        const normA = zMap[a] / Math.pow(countA, 0.7);
+        const normB = zMap[b] / Math.pow(countB, 0.7);
+        // 二级排序：生肖首号
+        return (normB - normA) || ((this.ZODIACS_MAP[a]?.[0] || 0) - (this.ZODIACS_MAP[b]?.[0] || 0));
+    }).slice(0, 6);
+
+    // 4. 波色生成
     const wMap: Record<string, number> = { red: 0, blue: 0, green: 0 };
     final18.forEach(s => wMap[s.wave] = (wMap[s.wave] || 0) + s.totalScore);
-    const recWaves = Object.keys(wMap).sort((a, b) => wMap[b as any] - wMap[a as any]);
+    const waveOrder: Record<string, number> = { 'red': 1, 'blue': 2, 'green': 3 };
+    const recWaves = Object.keys(wMap).sort((a, b) => (wMap[b as any] - wMap[a as any]) || (waveOrder[a] - waveOrder[b]));
 
-    // 头数
+    // 5. 头尾数生成
     const hMap: Record<number, number> = {};
     final18.forEach(s => {
         const h = Math.floor(s.num / 10);
         hMap[h] = (hMap[h] || 0) + s.totalScore;
     });
-    const recHeads = Object.keys(hMap).sort((a, b) => hMap[parseInt(b)] - hMap[parseInt(a)]).slice(0, 3).map(String);
+    const recHeads = Object.keys(hMap).sort((a, b) => (hMap[parseInt(b)] - hMap[parseInt(a)]) || (parseInt(a) - parseInt(b))).slice(0, 3).map(String);
 
-    // 尾数 (独立计算热度用于展示，不依赖 Strategy 返回值，避免类型混淆)
     const tailScores: Record<number, number> = {};
+    // 尾数趋势 (近20期权重)
     for (let i = 0; i < Math.min(history.length, 20); i++) {
         const nums = this.parseNumbers(history[i].open_code);
-        const weight = 20 - i;
         nums.forEach(n => {
             const t = n % 10;
-            tailScores[t] = (tailScores[t] || 0) + weight;
+            tailScores[t] = (tailScores[t] || 0) + (20 - i);
         });
     }
-    // 叠加 Top 18 的权重
+    // 叠加 Top 18 权重
     final18.forEach(s => {
         const t = s.num % 10;
-        tailScores[t] = (tailScores[t] || 0) + s.totalScore * 10;
+        tailScores[t] = (tailScores[t] || 0) + s.totalScore * 15;
     });
-    const recTails = Object.keys(tailScores).map(Number).sort((a, b) => tailScores[b] - tailScores[a]).slice(0, 5).map(String);
+    const recTails = Object.keys(tailScores).map(Number).sort((a, b) => (tailScores[b] - tailScores[a]) || (a - b)).slice(0, 5).map(String);
 
-    // 2. 智能推荐 (8码中特) - 直接使用综合算法得分最高的8个号码
+    // 6. 智能 8 码 (从 Top 18 中精选)
     const top8Stats = sortedStats.slice(0, 8);
     const aiEightCodes = top8Stats.map(s => s.num < 10 ? `0${s.num}` : `${s.num}`).sort();
     
-    analysisText += " | 综合算力精选";
-
     return {
       zodiacs: recZodiacs,
       numbers: resultNumbers,
@@ -143,12 +160,19 @@ export class PredictionEngine {
     };
   }
 
-  // --- Core Algorithm Functions ---
-  
+  // --- Core Engine ---
+
   static runBacktest(history: DbRecord[], windowSize: number): StrategyResult[] {
     const strategyDefinitions = this.getStrategies();
-    const results = strategyDefinitions.map(s => ({ name: s.name, rawScore: 0, maxPotential: 0 }));
+    const results = strategyDefinitions.map(s => ({ 
+        name: s.name, 
+        rawScore: 0, 
+        maxPotential: 0, 
+        recentHits: 0,
+        momentum: 0
+    }));
 
+    // 回测循环
     for (let i = 0; i < windowSize; i++) {
       const targetRecord = history[i];
       const trainingData = history.slice(i + 1);
@@ -157,33 +181,65 @@ export class PredictionEngine {
       const targetNum = this.parseNumbers(targetRecord.open_code).pop();
       if (!targetNum) continue;
 
-      const timeWeight = Math.pow(0.85, i);
+      // 时间衰减 (更关注近期)
+      const timeWeight = Math.pow(0.88, i);
 
       strategyDefinitions.forEach((strat, idx) => {
         const scores = strat.func(trainingData);
-        // 获取策略推荐的前 8 名
+        // 策略 Top 8
         const topPicked = Object.keys(scores)
           .map(Number)
-          .sort((a, b) => scores[b] - scores[a])
+          .sort((a, b) => (scores[b] - scores[a]) || (a - b))
           .slice(0, 8); 
         
+        // 记录最大可能得分用于归一化
         results[idx].maxPotential += timeWeight;
 
         if (topPicked.includes(targetNum)) {
           const rank = topPicked.indexOf(targetNum);
-          const rankBonus = (8 - rank) / 8; 
-          results[idx].rawScore += timeWeight * (0.5 + 0.5 * rankBonus);
+          
+          // 排名奖励：Rank 0=1.0, Rank 1=0.85, ... 指数级衰减
+          // 鼓励策略将目标号码排在前面
+          const rankScore = Math.pow(0.85, rank);
+          
+          results[idx].rawScore += timeWeight * rankScore;
+
+          // 动量计算
+          if (i < 5) {
+             results[idx].recentHits++;
+             results[idx].momentum += 3 * rankScore; // 近期命中加权极大
+          } else if (i < 10) {
+             results[idx].momentum += 1 * rankScore;
+          }
         }
       });
     }
 
     return results.map(r => {
-      const normalizedScore = r.maxPotential > 0 ? r.rawScore / r.maxPotential : 0;
-      const dynamicWeight = 1.0 + Math.pow(normalizedScore * 4, 2); 
+      // 1. 基础归一化得分
+      let normalizedScore = r.maxPotential > 0 ? r.rawScore / r.maxPotential : 0;
+      
+      // 2. 权重非线性放大 (拉开差距)
+      // 例如得分 0.2 -> 权重 4; 得分 0.5 -> 权重 25
+      let weight = Math.pow(normalizedScore * 10, 2);
+      
+      // 3. 动量修正
+      // 如果近期动量强，权重翻倍
+      if (r.momentum > 2) {
+          weight *= (1 + Math.log(r.momentum));
+      }
+      
+      // 4. 冷门惩罚
+      if (r.recentHits === 0) {
+          weight *= 0.3; // 快速降权
+      }
+
       return {
         name: r.name,
         score: normalizedScore,
-        weight: dynamicWeight
+        weight: weight,
+        momentum: r.momentum,
+        recentHits: r.recentHits
       };
     });
   }
@@ -202,25 +258,39 @@ export class PredictionEngine {
     const funcMap: Record<string, Function> = {};
     this.getStrategies().forEach(s => funcMap[s.name] = s.func);
 
-    strategies.forEach(strat => {
+    // 过滤掉权重过低的策略，减少噪音
+    const activeStrategies = strategies.filter(s => s.weight > 0.1);
+
+    activeStrategies.forEach(strat => {
       const logicFunc = funcMap[strat.name];
       if (logicFunc) {
         const scores = logicFunc(history);
-        for (let n = 1; n <= 49; n++) {
-          if (scores[n]) {
-            stats[n].totalScore += scores[n] * strat.weight;
-          }
+        
+        // 策略内归一化：将策略输出的任意分值映射到 0-1
+        let maxS = 0;
+        for (let n = 1; n <= 49; n++) { if (scores[n] && scores[n] > maxS) maxS = scores[n]; }
+        
+        if (maxS > 0) {
+            for (let n = 1; n <= 49; n++) {
+              if (scores[n]) {
+                // 累加：(策略内相对分 0-1) * (策略动态权重)
+                stats[n].totalScore += (scores[n] / maxS) * strat.weight;
+              }
+            }
         }
       }
     });
     
-    // 微小扰动防止同分
-    for (let n = 1; n <= 49; n++) stats[n].totalScore += (n * 0.00001); 
+    // 微小扰动防止同分 (基于号码本身大小的微小权重)
+    for (let n = 1; n <= 49; n++) stats[n].totalScore += (n * 0.000001); 
 
     return stats;
   }
 
+  // --- Strategy Definitions ---
+
   static getStrategies() {
+      // 31种确定性策略
       return [
         { name: '偏移轨迹 (Offset)', func: this.strategyOffset.bind(this) },
         { name: '遗漏回补 (Omission)', func: this.strategyOmission.bind(this) },
@@ -251,19 +321,46 @@ export class PredictionEngine {
         { name: '椭圆曲线 (ECC)', func: this.strategyEllipticCurve.bind(this) },
         { name: '卡尔曼滤波 (Kalman)', func: this.strategyKalmanFilter.bind(this) },
         { name: '矩阵行列式 (Matrix)', func: this.strategyMatrixDeterminant.bind(this) },
-        // 使用修复后的尾数策略
-        { name: '尾数趋势 (Tail)', func: this.strategyTailTrend.bind(this) }
+        { name: '尾数趋势 (Tail)', func: this.strategyTailTrend.bind(this) },
+        { name: '邻号规律 (Neighbor)', func: this.strategyNeighbor.bind(this) }
       ];
   }
 
   // --- Strategies Implementations ---
 
-  // [Fix] 尾数趋势：现在将尾数得分映射回所有相关号码 (1-49)，以便综合评分引擎正确使用
+  static strategyNeighbor(history: DbRecord[]): Record<number, number> {
+    const scores: Record<number, number> = {};
+    const lastNum = this.parseNumbers(history[0].open_code).pop() || 0;
+    
+    const left = lastNum - 1 < 1 ? 49 : lastNum - 1;
+    const right = lastNum + 1 > 49 ? 1 : lastNum + 1;
+    
+    scores[left] = 5;
+    scores[right] = 5;
+
+    let hits = 0;
+    for(let i=1; i<Math.min(history.length, 30); i++) {
+        const prev = this.parseNumbers(history[i].open_code).pop() || 0;
+        const curr = this.parseNumbers(history[i-1].open_code).pop() || 0;
+        const l = prev - 1 < 1 ? 49 : prev - 1;
+        const r = prev + 1 > 49 ? 1 : prev + 1;
+        if (curr === l || curr === r) {
+            hits++;
+        }
+    }
+    
+    if (hits > 5) {
+        scores[left] += hits;
+        scores[right] += hits;
+    }
+
+    return scores;
+  }
+
   static strategyTailTrend(history: DbRecord[]): Record<number, number> {
     const scores: Record<number, number> = {}; 
     const tailScores: Record<number, number> = {};
     
-    // 1. 计算尾数热度
     for (let i = 0; i < Math.min(history.length, 15); i++) { 
         const nums = this.parseNumbers(history[i].open_code); 
         const weight = 15 - i; 
@@ -273,7 +370,6 @@ export class PredictionEngine {
         }); 
     }
     
-    // 2. 映射回号码 (1-49)
     for (let n = 1; n <= 49; n++) {
         const t = n % 10;
         if (tailScores[t]) {
@@ -281,6 +377,44 @@ export class PredictionEngine {
         }
     }
     return scores;
+  }
+
+  static strategyMarkovChain(history: DbRecord[]): Record<number, number> {
+      const scores: Record<number, number> = {}; 
+      if (history.length < 50) return scores;
+
+      const lastNum = this.parseNumbers(history[0].open_code).pop() || 1; 
+      const prevLastNum = this.parseNumbers(history[1].open_code).pop() || 1;
+      
+      const transitionCounts: Record<number, number> = {};
+      
+      for (let i = 2; i < history.length - 1; i++) { 
+          const curr = this.parseNumbers(history[i].open_code).pop();
+          const prev = this.parseNumbers(history[i + 1].open_code).pop(); 
+          
+          if (curr === lastNum && prev === prevLastNum) { 
+              const nextNum = this.parseNumbers(history[i - 1].open_code).pop(); 
+              if (nextNum) { 
+                  transitionCounts[nextNum] = (transitionCounts[nextNum] || 0) + 1; 
+              } 
+          } 
+      }
+      
+      // Fallback to 1st order if 2nd order insufficient
+      if (Object.keys(transitionCounts).length === 0) {
+           for (let i = 1; i < history.length; i++) { 
+               const prevNum = this.parseNumbers(history[i].open_code).pop(); 
+               if (prevNum === lastNum) { 
+                   const nextNum = this.parseNumbers(history[i - 1].open_code).pop(); 
+                   if (nextNum) { 
+                       transitionCounts[nextNum] = (transitionCounts[nextNum] || 0) + 1; 
+                   } 
+               } 
+           }
+      }
+
+      Object.entries(transitionCounts).forEach(([num, count]) => { scores[parseInt(num)] = count * 8; });
+      return scores;
   }
 
   static strategyEllipticCurve(history: DbRecord[]): Record<number, number> {
@@ -444,7 +578,8 @@ export class PredictionEngine {
       const scores: Record<number, number> = {}; const getQuad = (n: number) => { if (n <= 12) return 1; if (n <= 24) return 2; if (n <= 36) return 3; return 4; };
       const lastNum = this.parseNumbers(history[0].open_code).pop() || 1; const lastQuad = getQuad(lastNum); const transFreq: Record<number, number> = {1:0, 2:0, 3:0, 4:0};
       for(let i=1; i<Math.min(history.length, 50); i++) { const prev = this.parseNumbers(history[i].open_code).pop() || 1; if (getQuad(prev) === lastQuad) { const curr = this.parseNumbers(history[i-1].open_code).pop() || 1; transFreq[getQuad(curr)]++; } }
-      const bestQuadStr = Object.keys(transFreq).sort((a,b)=>transFreq[Number(b)]-transFreq[Number(a)])[0]; const bestQuad = Number(bestQuadStr);
+      // 增加二级排序（按象限编号）
+      const bestQuadStr = Object.keys(transFreq).sort((a,b)=> (transFreq[Number(b)]-transFreq[Number(a)]) || (Number(a) - Number(b)))[0]; const bestQuad = Number(bestQuadStr);
       for(let i=1; i<=49; i++) { if (getQuad(i) === bestQuad) scores[i] = 4; }
       return scores;
   }
@@ -453,7 +588,8 @@ export class PredictionEngine {
       const currentVector = []; for(let i=0; i<vectorSize; i++) currentVector.push(this.parseNumbers(history[i].open_code).pop() || 0);
       const distances: { dist: number, nextNum: number }[] = [];
       for(let i = vectorSize; i < Math.min(history.length - vectorSize - 1, 200); i++) { let dist = 0; let valid = true; for(let j=0; j<vectorSize; j++) { const histNum = this.parseNumbers(history[i+j].open_code).pop() || 0; if (histNum === 0) valid = false; dist += Math.pow(currentVector[j] - histNum, 2); } if (valid) { const nextNum = this.parseNumbers(history[i-1].open_code).pop() || 0; distances.push({ dist: Math.sqrt(dist), nextNum }); } }
-      distances.sort((a,b) => a.dist - b.dist); const topK = distances.slice(0, k); topK.forEach(item => { if(item.nextNum > 0 && item.nextNum <= 49) scores[item.nextNum] = (scores[item.nextNum] || 0) + (100 / (item.dist + 1)); });
+      // 增加二级排序（按号码）
+      distances.sort((a,b) => (a.dist - b.dist) || (a.nextNum - b.nextNum)); const topK = distances.slice(0, k); topK.forEach(item => { if(item.nextNum > 0 && item.nextNum <= 49) scores[item.nextNum] = (scores[item.nextNum] || 0) + (100 / (item.dist + 1)); });
       return scores;
   }
   static strategyBitwiseVortex(history: DbRecord[]): Record<number, number> {
@@ -473,7 +609,8 @@ export class PredictionEngine {
   static strategyOffset(history: DbRecord[]): Record<number, number> {
     const scores: Record<number, number> = {}; const lastNum = this.parseNumbers(history[0].open_code).pop() || 1; const offsetCounts: Record<number, number> = {};
     for (let i = 0; i < Math.min(history.length - 1, 50); i++) { const curr = this.parseNumbers(history[i].open_code).pop(); const prev = this.parseNumbers(history[i + 1].open_code).pop(); if (curr && prev) { const diff = (curr - prev + 49) % 49; offsetCounts[diff] = (offsetCounts[diff] || 0) + 1; } }
-    Object.entries(offsetCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).forEach(([diffStr, count]) => { const nextNum = (lastNum + parseInt(diffStr) - 1) % 49 + 1; scores[nextNum] = count * 3; });
+    // 增加二级排序（按偏移量）
+    Object.entries(offsetCounts).sort((a, b) => (b[1] - a[1]) || (Number(a[0]) - Number(b[0]))).slice(0, 6).forEach(([diffStr, count]) => { const nextNum = (lastNum + parseInt(diffStr) - 1) % 49 + 1; scores[nextNum] = count * 3; });
     return scores;
   }
   static strategyOmission(history: DbRecord[]): Record<number, number> {
@@ -497,7 +634,8 @@ export class PredictionEngine {
   static strategyModulo(history: DbRecord[]): Record<number, number> {
     const scores: Record<number, number> = {}; const lastNum = this.parseNumbers(history[0].open_code).pop() || 1; const mod3 = lastNum % 3; const mod3NextFreq: Record<number, number> = { 0:0, 1:0, 2:0 };
     for (let i = 0; i < Math.min(history.length, 50); i++) { const curr = this.parseNumbers(history[i].open_code).pop(); const prev = this.parseNumbers(history[i+1].open_code).pop(); if (curr && prev && prev % 3 === mod3) { mod3NextFreq[curr % 3]++; } }
-    const bestMod = Object.keys(mod3NextFreq).sort((a,b) => mod3NextFreq[Number(b)] - mod3NextFreq[Number(a)])[0]; for (let n = 1; n <= 49; n++) { if (n % 3 === Number(bestMod)) scores[n] = 5; }
+    // 增加二级排序（按模数）
+    const bestMod = Object.keys(mod3NextFreq).sort((a,b) => (mod3NextFreq[Number(b)] - mod3NextFreq[Number(a)]) || (Number(a) - Number(b)))[0]; for (let n = 1; n <= 49; n++) { if (n % 3 === Number(bestMod)) scores[n] = 5; }
     return scores;
   }
   static strategyGoldenSection(history: DbRecord[]): Record<number, number> {
@@ -520,13 +658,8 @@ export class PredictionEngine {
   static strategyDigitSum(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {}; const lastNum = this.parseNumbers(history[0].open_code).pop() || 1; const getDigitSum = (n: number) => Math.floor(n/10) + n%10; const lastSum = getDigitSum(lastNum); const nextSumFreq: Record<number, number> = {};
       for(let i=1; i<Math.min(history.length, 60); i++) { const prev = this.parseNumbers(history[i].open_code).pop() || 1; const prevSum = getDigitSum(prev); if (prevSum === lastSum) { const curr = this.parseNumbers(history[i-1].open_code).pop() || 1; const currSum = getDigitSum(curr); nextSumFreq[currSum] = (nextSumFreq[currSum] || 0) + 1; } }
-      const topSums = Object.entries(nextSumFreq).sort((a,b)=>b[1]-a[1]).slice(0, 3).map(x=>parseInt(x[0])); for(let n=1; n<=49; n++) { if (topSums.includes(getDigitSum(n))) scores[n] = 5; }
-      return scores;
-  }
-  static strategyMarkovChain(history: DbRecord[]): Record<number, number> {
-      const scores: Record<number, number> = {}; const lastNum = this.parseNumbers(history[0].open_code).pop() || 1; const transitionCounts: Record<number, number> = {};
-      for (let i = 1; i < history.length; i++) { const prevNum = this.parseNumbers(history[i].open_code).pop(); if (prevNum === lastNum) { const nextNum = this.parseNumbers(history[i - 1].open_code).pop(); if (nextNum) { transitionCounts[nextNum] = (transitionCounts[nextNum] || 0) + 1; } } }
-      Object.entries(transitionCounts).forEach(([num, count]) => { scores[parseInt(num)] = count * 5; });
+      // 增加二级排序（按和数值）
+      const topSums = Object.entries(nextSumFreq).sort((a,b)=>(b[1]-a[1]) || (Number(a[0]) - Number(b[0]))).slice(0, 3).map(x=>parseInt(x[0])); for(let n=1; n<=49; n++) { if (topSums.includes(getDigitSum(n))) scores[n] = 5; }
       return scores;
   }
   static strategyPoisson(history: DbRecord[]): Record<number, number> {
@@ -543,7 +676,8 @@ export class PredictionEngine {
     history.forEach(rec => {
         this.parseNumbers(rec.open_code).forEach(n => freq[n] = (freq[n]||0)+1);
     });
-    const hotNums = Object.keys(freq).map(Number).sort((a,b)=>freq[b]-freq[a]).slice(0, 18);
+    // 增加二级排序 (按号码大小)
+    const hotNums = Object.keys(freq).map(Number).sort((a,b)=> (freq[b]-freq[a]) || (a - b)).slice(0, 18);
     const resultNums = hotNums.sort((a,b)=>a-b).map(n => n < 10 ? `0${n}` : `${n}`);
     
     // 兜底六肖
@@ -552,8 +686,16 @@ export class PredictionEngine {
         const z = this.NUM_TO_ZODIAC[n]; 
         if(z) zMap[z] = (zMap[z]||0) + 1;
     });
-    const recZodiacs = Object.keys(zMap).sort((a,b)=>zMap[b]-zMap[a]).slice(0, 6);
-    if(recZodiacs.length < 6) recZodiacs.push(...['鼠','牛','虎','兔','龙','蛇'].filter(z=>!recZodiacs.includes(z)));
+    // 增加二级排序
+    const recZodiacs = Object.keys(zMap).sort((a,b)=> (zMap[b]-zMap[a]) || ((this.ZODIACS_MAP[a]?.[0]||0) - (this.ZODIACS_MAP[b]?.[0]||0))).slice(0, 6);
+    
+    // 兜底补足
+    const backups = ['鼠','牛','虎','兔','龙','蛇'];
+    if(recZodiacs.length < 6) {
+        backups.forEach(z => {
+            if(!recZodiacs.includes(z) && recZodiacs.length < 6) recZodiacs.push(z);
+        });
+    }
 
     return {
         zodiacs: recZodiacs.slice(0, 6),
