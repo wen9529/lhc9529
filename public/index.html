@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
   <head>
@@ -48,24 +49,33 @@
         console.log("PWA install event captured globally");
       });
     </script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@^19.2.3",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+        "react/": "https://esm.sh/react@^19.2.3/"
+      }
+    }
+    </script>
   </head>
   <body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
     <div id="root"></div>
     
     <!-- 3. 按依赖顺序加载脚本，使用 text/babel 类型 -->
-    <!-- 添加 ?v=20.1 版本号强制刷新 Telegram 缓存 -->
-    <script type="text/babel" data-presets="typescript" src="/types.ts?v=20.1"></script>
-    <script type="text/babel" data-presets="typescript" src="/lib/zodiac.ts?v=20.1"></script>
-    <script type="text/babel" data-presets="typescript" src="/lib/wave.ts?v=20.1"></script>
+    <!-- 添加 ?v=20.6 版本号强制刷新 -->
+    <script type="text/babel" data-presets="typescript" src="/types.ts?v=20.6"></script>
+    <script type="text/babel" data-presets="typescript" src="/lib/zodiac.ts?v=20.6"></script>
+    <script type="text/babel" data-presets="typescript" src="/lib/wave.ts?v=20.6"></script>
     
-    <script type="text/babel" data-presets="typescript,react" src="/App.tsx?v=20.1"></script>
-    <script type="text/babel" data-presets="typescript,react" src="/index.tsx?v=20.1"></script>
+    <script type="text/babel" data-presets="typescript,react" src="/App.tsx?v=20.6"></script>
+    <script type="text/babel" data-presets="typescript,react" src="/index.tsx?v=20.6"></script>
 
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           // 注册时也加上版本号，确保 SW 更新
-          navigator.serviceWorker.register('/sw.js?v=11').then(reg => {
+          navigator.serviceWorker.register('/sw.js?v=12').then(reg => {
             // 尝试更新
             reg.update();
           }).catch(err => console.log('SW Fail', err));

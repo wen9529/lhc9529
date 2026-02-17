@@ -2,6 +2,7 @@
 // File: functions/telegram.ts
 import { Env, LotteryType } from './types';
 import { PredictionEngine } from './lib/prediction';
+import { getZodiac, getZodiacMode } from './lib/zodiac';
 
 type PagesFunction<T = unknown> = (context: {
   request: Request;
@@ -17,7 +18,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const status = {
      status: "Active",
      message: "Telegram Bot Function is running.",
-     version: "v20.0 Gemini Awakening (AI + 29 Strategies)",
+     version: "v20.6 NoAI (CNY)",
      timestamp: new Date().toISOString()
   };
   return new Response(JSON.stringify(status, null, 2), {
@@ -87,30 +88,30 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (command === '/start' || command === '/id' || command === '/menu' || command === '/help') {
       const isAdmin = String(chatId) === String(env.ADMIN_CHAT_ID);
       
-      let msg = `🌌 <b>双子觉醒 v20.0 (Gemini Awakening)</b>\n`;
+      let msg = `🌌 <b>双子觉醒 v20.6 (NoAI CNY)</b>\n`;
       msg += `━━━━━━━━━━━━━━━━━━\n`;
       
       if (isAdmin) {
-        msg += `已集成 Google Gemini AI 引擎。\n请点击下方命令进行操作：\n\n`;
+        msg += `纯数学概率与混沌算法引擎。\n请点击下方命令进行操作：\n\n`;
         
         msg += `🇭🇰 <b>香港 (HK)</b>\n`;
         msg += `/sync_HK  🔄 同步\n`;
-        msg += `/predict_HK  🔮 预测 (含AI)\n`;
+        msg += `/predict_HK  🔮 预测\n`;
         msg += `/list_HK  📂 记录\n\n`;
         
         msg += `🇲🇴 <b>新澳 (MO_NEW)</b>\n`;
         msg += `/sync_NEW  🔄 同步\n`;
-        msg += `/predict_NEW  🔮 预测 (含AI)\n`;
+        msg += `/predict_NEW  🔮 预测\n`;
         msg += `/list_NEW  📂 记录\n\n`;
         
         msg += `👴 <b>老澳 (MO_OLD)</b>\n`;
         msg += `/sync_OLD  🔄 同步\n`;
-        msg += `/predict_OLD  🔮 预测 (含AI)\n`;
+        msg += `/predict_OLD  🔮 预测\n`;
         msg += `/list_OLD  📂 记录\n\n`;
 
         msg += `🌙 <b>老澳 22:30</b>\n`;
         msg += `/sync_OLD_2230  🔄 同步\n`;
-        msg += `/predict_OLD_2230  🔮 预测 (含AI)\n`;
+        msg += `/predict_OLD_2230  🔮 预测\n`;
         msg += `/list_OLD_2230  📂 记录\n\n`;
         
         msg += `⚙️ <b>系统</b>\n`;
@@ -157,10 +158,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         return new Response('OK');
       }
 
-      await sendMessage(env.TELEGRAM_TOKEN, chatId, `🤖 AI 正在深度分析 ${targetType} 历史数据...`);
+      await sendMessage(env.TELEGRAM_TOKEN, chatId, `🤖 正在深度分析 ${targetType} 历史数据 (马年排位)...`);
 
-      // 异步调用 AI 预测引擎
-      const predictionData = await PredictionEngine.generate(results as any[], targetType, env.GEMINI_API_KEY);
+      // 异步调用预测引擎 (纯算法)
+      const predictionData = await PredictionEngine.generate(results as any[], targetType);
       
       const lastExpect = (results[0] as any).expect;
       const nextExpect = String(BigInt(lastExpect) + 1n);
@@ -171,9 +172,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
       const waveName = (w: string) => w === 'red' ? '🟥红' : w === 'blue' ? '🟦蓝' : '🟩绿';
       
-      const msg = `🔮 <b>${targetType} 第 ${nextExpect} 期</b>\n` +
+      const msg = `🔮 <b>${targetType} 第 ${nextExpect} 期 (马年)</b>\n` +
                   `━━━━━━━━━━━━━━━━━━\n` +
-                  `🤖 <b>AI 8码中特:</b>\n` + 
+                  `🤖 <b>精选 8码:</b>\n` + 
                   `<code>${predictionData.ai_eight_codes?.join(' ') || '计算中...'}</code>\n\n` +
                   `🔢 <b>18码推荐:</b>\n` +
                   `<code>${predictionData.numbers.join(' ')}</code>\n\n` +
@@ -193,7 +194,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         return new Response('OK');
       }
       const { results } = await env.DB.prepare(
-        "SELECT expect, open_code FROM lottery_records WHERE lottery_type = ? ORDER BY expect DESC LIMIT 10"
+        "SELECT expect, open_code, open_time FROM lottery_records WHERE lottery_type = ? ORDER BY expect DESC LIMIT 10"
       ).bind(targetType).all();
 
       if (!results.length) {
@@ -201,7 +202,11 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       } else {
         let msg = `📂 <b>${targetType} 近10期:</b>\n\n`;
         results.forEach((r: any) => {
-           msg += `<code>${r.expect}期: ${r.open_code}</code>\n`;
+           const nums = r.open_code.split(',');
+           const special = nums[nums.length - 1];
+           // 动态判断生肖模式：传入 open_time 进行精确判定 (CNY Logic)
+           const z = getZodiac(special, r.expect, r.open_time);
+           msg += `<code>${r.expect}: ${r.open_code} + [${z}]</code>\n`;
         });
         await sendMessage(env.TELEGRAM_TOKEN, chatId, msg, { parse_mode: 'HTML' });
       }
