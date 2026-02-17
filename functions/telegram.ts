@@ -18,7 +18,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const status = {
      status: "Active",
      message: "Telegram Bot Function is running.",
-     version: "v20.6 NoAI (CNY)",
+     version: "v20.7 NoAI (CNY)",
      timestamp: new Date().toISOString()
   };
   return new Response(JSON.stringify(status, null, 2), {
@@ -78,7 +78,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       if (['HK', '香港'].includes(t)) return LotteryType.HK;
       if (['NEW', 'MO_NEW', '新澳'].includes(t)) return LotteryType.MO_NEW;
       if (['OLD', 'MO_OLD', '老澳'].includes(t)) return LotteryType.MO_OLD;
-      if (['2230', 'MO_OLD_2230', 'OLD_2230'].includes(t)) return LotteryType.MO_OLD_2230;
+      // 移除 22:30 支持
       return null;
     };
 
@@ -88,7 +88,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     if (command === '/start' || command === '/id' || command === '/menu' || command === '/help') {
       const isAdmin = String(chatId) === String(env.ADMIN_CHAT_ID);
       
-      let msg = `🌌 <b>双子觉醒 v20.6 (NoAI CNY)</b>\n`;
+      let msg = `🌌 <b>双子觉醒 v20.7 (NoAI CNY)</b>\n`;
       msg += `━━━━━━━━━━━━━━━━━━\n`;
       
       if (isAdmin) {
@@ -108,11 +108,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         msg += `/sync_OLD  🔄 同步\n`;
         msg += `/predict_OLD  🔮 预测\n`;
         msg += `/list_OLD  📂 记录\n\n`;
-
-        msg += `🌙 <b>老澳 22:30</b>\n`;
-        msg += `/sync_OLD_2230  🔄 同步\n`;
-        msg += `/predict_OLD_2230  🔮 预测\n`;
-        msg += `/list_OLD_2230  📂 记录\n\n`;
         
         msg += `⚙️ <b>系统</b>\n`;
         msg += `/del_help  🗑 删除指南\n`;
@@ -261,7 +256,6 @@ async function syncData(env: Env, type: LotteryType): Promise<number> {
     case LotteryType.HK: apiUrl = env.URL_HK; break;
     case LotteryType.MO_NEW: apiUrl = env.URL_MO_NEW; break;
     case LotteryType.MO_OLD: apiUrl = env.URL_MO_OLD; break;
-    case LotteryType.MO_OLD_2230: apiUrl = env.URL_MO_OLD_2230; break;
   }
   if (!apiUrl) throw new Error(`未配置 API`);
   

@@ -2,8 +2,7 @@
 export enum LotteryType {
   HK = 'HK',
   MO_NEW = 'MO_NEW',
-  MO_OLD = 'MO_OLD',
-  MO_OLD_2230 = 'MO_OLD_2230'
+  MO_OLD = 'MO_OLD'
 }
 
 export interface LotteryRecord {
@@ -61,5 +60,4 @@ export interface Env {
   URL_HK: string;
   URL_MO_NEW: string;
   URL_MO_OLD: string;
-  URL_MO_OLD_2230: string;
 }

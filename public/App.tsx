@@ -173,11 +173,7 @@ const PredictionHistoryModal = ({ isOpen, onClose, predHistory, resultHistory })
                 <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                    <div className="flex flex-col">
                      <span className="font-bold text-slate-700 text-sm">目标: 第 {predRecord.target_expect} 期</span>
-                     {predData?.strategy_analysis && (
-                       <span className="text-[9px] text-slate-400 mt-0.5 max-w-[200px] truncate">
-                         {predData.strategy_analysis.split(' | ')[0]}
-                       </span>
-                     )}
+                     {/* 移除了核心引擎分析文案显示 */}
                    </div>
                    {verify ? (
                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${verify.isSpecialHit ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-200 text-slate-500'}`}>
@@ -367,7 +363,7 @@ window.App = function App() {
           <TabButton active={activeTab === LotteryType.HK} label="香港" onClick={() => setActiveTab(LotteryType.HK)} />
           <TabButton active={activeTab === LotteryType.MO_NEW} label="新澳" onClick={() => setActiveTab(LotteryType.MO_NEW)} />
           <TabButton active={activeTab === LotteryType.MO_OLD} label="老澳" onClick={() => setActiveTab(LotteryType.MO_OLD)} />
-          <TabButton active={activeTab === LotteryType.MO_OLD_2230} label="22:30" onClick={() => setActiveTab(LotteryType.MO_OLD_2230)} />
+          {/* 移除 22:30 选项 */}
         </div>
       </div>
 
@@ -453,13 +449,7 @@ window.App = function App() {
 
                 {nextPred ? (
                   <div className="p-4 space-y-5">
-                    {nextPred.strategy_analysis && (
-                      <div className="bg-indigo-50/50 rounded-lg p-2 text-center border border-indigo-100">
-                         <p className="text-[10px] text-indigo-600 font-medium">
-                           核心引擎: <span className="font-bold">{nextPred.strategy_analysis.split(' | ')[0]}</span>
-                         </p>
-                      </div>
-                    )}
+                    {/* 移除了 "核心引擎" 的显示块 */}
 
                     {/* 六肖和波色 */}
                     <div className="grid grid-cols-2 gap-4">
@@ -526,7 +516,6 @@ window.App = function App() {
                       
                       <div className="flex flex-wrap gap-3 justify-center bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">
                         {nextPred.numbers.map((num, i) => {
-                           // 依然高亮前8个作为“AI/综合精选”
                            const isAiSelected = nextPred.ai_eight_codes && nextPred.ai_eight_codes.includes(num);
                            return (
                              <div key={i} className={`relative p-1 rounded-xl transition-all duration-500 ${isAiSelected ? 'bg-red-50 ring-2 ring-red-500 animate-[pulse-red_2s_infinite]' : ''}`}>

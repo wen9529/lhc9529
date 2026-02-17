@@ -14,13 +14,12 @@ interface StrategyResult {
 }
 
 /**
- * 🌌 Omniscient Core v20.6 (Pure Math)
- * 移除了外部 AI 依赖，完全基于概率统计和混沌算法
+ * 🌌 Omniscient Core v20.7 (Precision Math)
+ * 修正了尾数策略的映射问题，确保所有号码均能被算法覆盖
  */
 export class PredictionEngine {
 
-  // 1=马 (Horse Year Logic for NEXT prediction)
-  // 注意：此处仅用于预测引擎内部生成分析，若跨年需确保此处逻辑与当年一致
+  // 1=马 (Horse Year Logic for NEXT prediction - 2026)
   static ZODIACS_MAP: Record<string, number[]> = {
     '马': [1, 13, 25, 37, 49], 
     '蛇': [2, 14, 26, 38], 
@@ -89,7 +88,7 @@ export class PredictionEngine {
     const final18 = sortedStats.slice(0, 18);
     const resultNumbers = final18.map(s => s.num).sort((a, b) => a - b).map(n => n < 10 ? `0${n}` : `${n}`);
 
-    // 六肖 (基于得分权重)
+    // 六肖 (基于 Top 18 的加权统计)
     const zMap: Record<string, number> = {};
     final18.forEach((s, idx) => {
         const w = idx < 10 ? 2 : 1;
@@ -110,21 +109,28 @@ export class PredictionEngine {
     });
     const recHeads = Object.keys(hMap).sort((a, b) => hMap[parseInt(b)] - hMap[parseInt(a)]).slice(0, 3).map(String);
 
-    // 尾数
-    const tailTrend = this.strategyTailTrend(history);
-    const tMap: Record<number, number> = {};
-    Object.entries(tailTrend).forEach(([t, s]) => tMap[Number(t)] = s);
+    // 尾数 (独立计算热度用于展示，不依赖 Strategy 返回值，避免类型混淆)
+    const tailScores: Record<number, number> = {};
+    for (let i = 0; i < Math.min(history.length, 20); i++) {
+        const nums = this.parseNumbers(history[i].open_code);
+        const weight = 20 - i;
+        nums.forEach(n => {
+            const t = n % 10;
+            tailScores[t] = (tailScores[t] || 0) + weight;
+        });
+    }
+    // 叠加 Top 18 的权重
     final18.forEach(s => {
         const t = s.num % 10;
-        tMap[t] = (tMap[t] || 0) + s.totalScore * 5;
+        tailScores[t] = (tailScores[t] || 0) + s.totalScore * 10;
     });
-    const recTails = Object.keys(tMap).map(Number).sort((a, b) => tMap[b] - tMap[a]).slice(0, 5).map(String);
+    const recTails = Object.keys(tailScores).map(Number).sort((a, b) => tailScores[b] - tailScores[a]).slice(0, 5).map(String);
 
     // 2. 智能推荐 (8码中特) - 直接使用综合算法得分最高的8个号码
     const top8Stats = sortedStats.slice(0, 8);
     const aiEightCodes = top8Stats.map(s => s.num < 10 ? `0${s.num}` : `${s.num}`).sort();
     
-    analysisText += " | 综合算力生成";
+    analysisText += " | 综合算力精选";
 
     return {
       zodiacs: recZodiacs,
@@ -137,7 +143,7 @@ export class PredictionEngine {
     };
   }
 
-  // --- Core Algorithm Functions (Keep Unchanged) ---
+  // --- Core Algorithm Functions ---
   
   static runBacktest(history: DbRecord[], windowSize: number): StrategyResult[] {
     const strategyDefinitions = this.getStrategies();
@@ -155,6 +161,7 @@ export class PredictionEngine {
 
       strategyDefinitions.forEach((strat, idx) => {
         const scores = strat.func(trainingData);
+        // 获取策略推荐的前 8 名
         const topPicked = Object.keys(scores)
           .map(Number)
           .sort((a, b) => scores[b] - scores[a])
@@ -207,13 +214,13 @@ export class PredictionEngine {
       }
     });
     
+    // 微小扰动防止同分
     for (let n = 1; n <= 49; n++) stats[n].totalScore += (n * 0.00001); 
 
     return stats;
   }
 
   static getStrategies() {
-      // 保持原有策略列表
       return [
         { name: '偏移轨迹 (Offset)', func: this.strategyOffset.bind(this) },
         { name: '遗漏回补 (Omission)', func: this.strategyOmission.bind(this) },
@@ -243,11 +250,39 @@ export class PredictionEngine {
         { name: '引力场 (Gravity)', func: this.strategyGravityField.bind(this) },
         { name: '椭圆曲线 (ECC)', func: this.strategyEllipticCurve.bind(this) },
         { name: '卡尔曼滤波 (Kalman)', func: this.strategyKalmanFilter.bind(this) },
-        { name: '矩阵行列式 (Matrix)', func: this.strategyMatrixDeterminant.bind(this) }
+        { name: '矩阵行列式 (Matrix)', func: this.strategyMatrixDeterminant.bind(this) },
+        // 使用修复后的尾数策略
+        { name: '尾数趋势 (Tail)', func: this.strategyTailTrend.bind(this) }
       ];
   }
 
-  // Strategies Implementations (Copying strictly to ensure no logic loss)
+  // --- Strategies Implementations ---
+
+  // [Fix] 尾数趋势：现在将尾数得分映射回所有相关号码 (1-49)，以便综合评分引擎正确使用
+  static strategyTailTrend(history: DbRecord[]): Record<number, number> {
+    const scores: Record<number, number> = {}; 
+    const tailScores: Record<number, number> = {};
+    
+    // 1. 计算尾数热度
+    for (let i = 0; i < Math.min(history.length, 15); i++) { 
+        const nums = this.parseNumbers(history[i].open_code); 
+        const weight = 15 - i; 
+        nums.forEach(n => { 
+            const t = n % 10; 
+            tailScores[t] = (tailScores[t] || 0) + weight; 
+        }); 
+    }
+    
+    // 2. 映射回号码 (1-49)
+    for (let n = 1; n <= 49; n++) {
+        const t = n % 10;
+        if (tailScores[t]) {
+            scores[n] = tailScores[t];
+        }
+    }
+    return scores;
+  }
+
   static strategyEllipticCurve(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {};
       const a = 2, b = 3; const p = 49; 
@@ -501,10 +536,6 @@ export class PredictionEngine {
   static strategyRegression(history: DbRecord[]): Record<number, number> {
       const scores: Record<number, number> = {}; for(let num=1; num<=49; num++) { const gaps: number[] = []; let lastIndex = -1; for(let i=0; i<Math.min(history.length, 100); i++) { const nums = this.parseNumbers(history[i].open_code); if (nums.includes(num)) { if (lastIndex !== -1) gaps.push(i - lastIndex); lastIndex = i; if (gaps.length >= 3) break; } } if (gaps.length >= 2) { if (gaps[0] < gaps[1]) { scores[num] = 5; if (gaps.length >=3 && gaps[1] < gaps[2]) scores[num] += 3; } } }
       return scores;
-  }
-  static strategyTailTrend(history: DbRecord[]): Record<number, number> {
-    const scores: Record<number, number> = {}; for (let i = 0; i < Math.min(history.length, 15); i++) { const nums = this.parseNumbers(history[i].open_code); const weight = 15 - i; nums.forEach(n => { const t = n % 10; scores[t] = (scores[t] || 0) + weight; }); }
-    return scores;
   }
 
   private static generateFallback(history: DbRecord[]): PredictionData {

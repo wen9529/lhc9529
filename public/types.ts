@@ -4,8 +4,7 @@
 window.LotteryType = {
   HK: 'HK',
   MO_NEW: 'MO_NEW',
-  MO_OLD: 'MO_OLD',
-  MO_OLD_2230: 'MO_OLD_2230'
+  MO_OLD: 'MO_OLD'
 };
 
 export interface DbRecord {
